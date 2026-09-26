@@ -49,15 +49,14 @@ Make every existing screen of the staff app work end to end against the real `sm
 
 ### 3.1 Trip start attribution
 
-`POST /v1/staff/trips` (`TripService.StartAsync`, `dbo.trip_start` redefined in migration `db/postgres/migrations/0005_trip_start_assignment_attribution.sql`; the baseline `14_transport_procs.sql` is updated to match so fresh databases agree):
+`POST /v1/staff/trips` (`TripService.StartAsync`). The check is done in C# before calling the unchanged `dbo.trip_start` function, which already fills `ConductorId` from `Buses.ConductorStaffId`; **no migration is needed**:
 
-1. Resolve the bus by `bus_no` within the caller's tenant. Unknown bus → 404 `bus_not_found`.
-2. Resolve the bus's assigned driver (`Buses.DriverStaffId → Staff.UserId`) and conductor (`Buses.ConductorStaffId → Staff.UserId`).
+1. `bus_no` missing/blank → 422 `bus_no_required`.
+2. Resolve the bus by `bus_no` within the caller's tenant, with its assigned driver (`Buses.DriverStaffId → Staff.UserId`) and conductor (`Buses.ConductorStaffId → Staff.UserId`). Unknown bus → 404 `bus_not_found`.
 3. No assigned driver → 422 `no_driver_assigned`.
 4. Caller's user id must equal the assigned driver's or conductor's user id, else 403 `not_assigned`.
-5. Insert the trip with `DriverId` = assigned driver user, `ConductorId` = assigned conductor user (or null). The caller's identity never populates either column.
-6. Existing 409 `bus_already_active` preserved. `route_id` defaults to `Buses.RouteId` when omitted.
-7. Tenant/RLS rules unchanged; the function still filters by `TenantId`.
+5. Call `dbo.trip_start` with `DriverId` = the **assigned driver's** user id (never the caller's). `ConductorId` is filled by the function from the bus (or null). `route_id` defaults to `Buses.RouteId` when omitted.
+6. Existing 409 `bus_already_active` preserved. Tenant/RLS rules unchanged.
 
 ### 3.2 Assignment for conductors
 
@@ -90,7 +89,7 @@ The staff `Trip` response gains `current_stop_id` (from `Trips.CurrentStopId`).
 `db/dev-seed/staff_e2e.sql`, idempotent (fixed UUIDs, `INSERT … ON CONFLICT DO UPDATE`), run by a `seed` compose profile service after `migrate`. Never part of the migration chain. Seeds:
 
 - One tenant, status `active`, with a school location (lat/lng/radius).
-- Staff with email logins (`MustSetPassword=true`, first login via OTP from the dev console): driver, conductor, sweeper, gardener, guard, peon — designations mapping to each `role_key`.
+- Staff with email logins: driver, conductor, sweeper, gardener, guard, peon — designations mapping to each `role_key`. The seed creates each `Users` row (fixed id, `MustSetPassword=true`, no password hash, role `staff`) and links `Staff.UserId`, so user-keyed rows (leave entitlements) can be seeded. First login: email + any password → `password_not_set` → OTP (printed by the dev console sender) → set password.
 - One bus with the driver and conductor assigned, on one route with 4 stops.
 - Students assigned to the bus at stops.
 - One task per staff role, leave balances for each staff member.
@@ -111,7 +110,7 @@ The staff `Trip` response gains `current_stop_id` (from `Trips.CurrentStopId`).
 2. **Login.** `buildLoginRequest` → `{email | phone, password}`; no `role`. After `/auth/me`, a null `role_key` aborts the session with a clear "no staff app role — contact your school admin" error. `ThemeProvider` no longer feeds login; it only persists the last theme.
 3. **Token refresh.** `httpClient` gains a single-flight 401 handler: on 401 from any non-`/auth/*` request, call `POST /auth/refresh {refresh_token}` once, persist the rotated `{access_token, refresh_token}`, update `authSnapshot`, and replay the original request once. Concurrent 401s await the same refresh. Refresh failure clears the session and routes to Login. `auth.repo.refresh` parses `tokenSchema` (tokens only). Bootstrap attempts a refresh when `/auth/me` returns 401 before logging out.
 4. **Errors.** `fetch` rejections → `AppError('network', 0)`. Empty-body 403 → `forbidden`. `authErrors` gains messages for billing-gate codes (`tenant_pending_activation` etc., 403) and `past_due` (402).
-5. **Response validation.** Every HTTP repo parses the unwrapped `data` with a zod schema in `src/data/http/schemas/<feature>.schema.ts`. Schemas are `.passthrough()`; only fields the app reads are required. Parse failure → `AppError('contract_mismatch', 0)` with the zod path logged in dev.
+5. **Response validation.** Every HTTP repo parses the unwrapped `data` with a zod schema in `src/data/http/schemas/<feature>.schema.ts`. Unknown fields are ignored (zod strips them), so new server fields never break old apps; only fields the app reads are required. Parse failure → `AppError('contract_mismatch', 0)` with the zod path logged in dev.
 
 ## 5. App: feature contract fixes
 
@@ -167,7 +166,7 @@ Mock repos move to the live shapes: trips carry `current_stop_id` and `arrived`;
 
 | Repo | Files / areas |
 |---|---|
-| `sms-api` | `TripService`, `TripController` (new `/stops`), `TransportModule` (assignment query, stop-progress query, trip `current_stop_id`), `db/postgres/migrations/0005_…sql`, `db/postgres/14_transport_procs.sql`, `db/dev-seed/staff_e2e.sql`, `docker-compose.yml` (`seed` profile), `tests/Sms.Tests.Integration/Transport/*` |
+| `sms-api` | `TripService`, `TripController` (new `/stops`), `TransportModule` (bus-assignment lookup, assignment query, stop-progress query, trip `current_stop_id`), `db/dev-seed/staff_e2e.sql`, `docker-compose.yml` (`seed` profile), `tests/Sms.Tests.Integration/Transport/*` |
 | `sms-staff` | `.env.example`, `README.md`, `src/lib/httpClient.ts`, `src/lib/errors.ts`, `src/features/auth/*`, `src/data/http/schemas/*` (new), `src/data/http/*.repo.ts`, `src/data/http/mappers.ts`, `src/data/domain*`, `src/data/repositories/types.ts`, `src/data/mock/*`, `src/features/trip/{hooks,useStopProgress,stopProgress,pingQueue,broadcaster}.ts`, `src/screens/{TripScreen,LiveMapScreen,HomeScreen}.tsx`, tests alongside |
 | Parent / teacher / admin apps | None |
 
