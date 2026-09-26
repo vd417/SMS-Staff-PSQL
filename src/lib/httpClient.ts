@@ -36,11 +36,18 @@ export function createHttpClient(opts: HttpClientOptions): HttpClient {
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
     if (tenantId) headers['X-Tenant-Id'] = tenantId;
 
-    const res = await fetchImpl(`${opts.baseUrl}${path}`, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
+    let res: Response;
+    try {
+      res = await fetchImpl(`${opts.baseUrl}${path}`, {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+    } catch {
+      // No response at all (offline, DNS, server down) — typed so screens can say
+      // "cannot reach server" instead of surfacing a raw TypeError.
+      throw new AppError('network', 0, 'Network request failed');
+    }
 
     let payload: unknown = null;
     try {
@@ -49,7 +56,7 @@ export function createHttpClient(opts: HttpClientOptions): HttpClient {
       payload = null;
     }
 
-    // sms-backend wraps every body: success as { data: T }, failure as
+    // sms-api wraps every body: success as { data: T }, failure as
     // { error: { code, message, details } }. Fall back to a flat body so
     // test doubles / mocks that hand back unwrapped JSON keep working.
     const envelope = (payload ?? {}) as {
@@ -61,7 +68,9 @@ export function createHttpClient(opts: HttpClientOptions): HttpClient {
 
     if (!res.ok) {
       const err = envelope.error ?? envelope;
-      throw new AppError(err.code ?? 'http_error', res.status, err.message ?? `HTTP ${res.status}`);
+      // sms-api's tenant-header mismatch is a bare 403 with no body.
+      const fallbackCode = res.status === 403 ? 'forbidden' : 'http_error';
+      throw new AppError(err.code ?? fallbackCode, res.status, err.message ?? `HTTP ${res.status}`);
     }
     return ('data' in envelope ? envelope.data : payload) as T;
   }
