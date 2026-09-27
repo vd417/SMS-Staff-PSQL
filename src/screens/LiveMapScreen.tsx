@@ -7,9 +7,11 @@ import { useTheme } from '@/theme';
 import { IconBtn, Btn, Pill, Skeleton, useToast } from '@/components/ui';
 import { ErrorState } from '@/components/state';
 import { TextScale } from '@/theme/typography';
-import { useTripAssignment, useCurrentTrip, useRoster, useBoarding } from '@/features/trip/hooks';
+import { useTripAssignment, useCurrentTrip, useRoster, useBoarding, useTripStops, useStopActions } from '@/features/trip/hooks';
 import { useRouteGeometry } from '@/features/trip/useRouteGeometry';
 import { useStopProgress } from '@/features/trip/useStopProgress';
+import { stopActionMessage } from '@/features/trip/stopActionMessage';
+import type { StopAction } from '@/features/trip/stopProgress';
 import { LiveMapView } from '@/features/map/LiveMapView';
 import { toMapCoords } from '@/features/map/toMapCoords';
 import { distanceMeters } from '@/lib/geo';
@@ -38,6 +40,10 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
   const tripId = route.params.tripId;
   const roster = useRoster(tripId);
   const boarding = useBoarding(tripId);
+  const tripActive = current.data?.status === 'live' || current.data?.status === 'arrived';
+  const tripStops = useTripStops(tripId, tripActive);
+  const stopAction = useStopActions(tripId);
+  const [stopError, setStopError] = useState<string | null>(null);
   const geometry = useRouteGeometry(assignment.data?.route.id);
   const mapRef = useRef<LiveMapHandle>(null);
   const hasFitRef = useRef(false);
@@ -48,12 +54,6 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
   const [justCompletedStopName, setJustCompletedStopName] = useState<string | null>(null);
   const [bottomCardHeight, setBottomCardHeight] = useState(0);
   const [mapReady, setMapReady] = useState(false);
-  const [gpsUnavailable, setGpsUnavailable] = useState(false);
-  const liveMarkerRef = useRef<LiveMarker | null>(null);
-
-  useEffect(() => {
-    liveMarkerRef.current = liveMarker;
-  }, [liveMarker]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -64,21 +64,11 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
     let subscription: { remove: () => void } | null = null;
     let cancelled = false;
 
-    // Permission granted and the subscription started fine, but no fix ever
-    // arrives (indoors, cold start, airplane mode toggled after subscribing).
-    // Fall back to the manual "I've arrived" flow after a reasonable wait.
-    const noFixTimeout = setTimeout(() => {
-      if (!cancelled && liveMarkerRef.current == null) {
-        setGpsUnavailable(true);
-      }
-    }, 15000);
-
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (cancelled) return;
       if (status !== 'granted') {
         toast.show(t('trip.locationDenied'), 'error');
-        if (!cancelled) setGpsUnavailable(true);
         return;
       }
       try {
@@ -104,13 +94,11 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
         }
       } catch {
         // GPS unavailable — leave liveMarker null, route/stops still render.
-        if (!cancelled) setGpsUnavailable(true);
       }
     })();
 
     return () => {
       cancelled = true;
-      clearTimeout(noFixTimeout);
       subscription?.remove();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -123,7 +111,7 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
   const statusLabel = t(`trip.${gpsStatus === 'live' ? 'live' : gpsStatus}`);
 
   const stops = useMemo(() => assignment.data?.route.stops ?? [], [assignment.data]);
-  const progress = useStopProgress(stops, roster.data ?? [], boarding.data ?? [], liveMarker);
+  const progress = useStopProgress(stops, tripStops.data, roster.data ?? [], boarding.data ?? []);
   const activeStop = progress.activeStop;
   const stopStudents = useMemo(
     () => (activeStop ? roster.data?.filter((s) => s.stopId === activeStop.id) ?? [] : []),
@@ -167,18 +155,34 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
     );
   };
 
+  const runStopAction = (action: StopAction, onDone?: () => void) => {
+    setStopError(null);
+    stopAction.mutate(action, {
+      onSuccess: () => onDone?.(),
+      onError: (e) => setStopError(stopActionMessage(e, t)),
+    });
+  };
+
   const onMarkPickedUp = () => {
     if (!activeStop) return;
-    const completedName = activeStop.name;
+    // Records boarding only — departing the stop is a separate, explicit Depart stop tap.
     stopStudents.forEach((s) => {
       const hasRecord = boarding.data?.some((b) => b.studentId === s.id);
       if (!hasRecord) {
         boarding.setBoarding.mutate({ tripId, studentId: s.id, stopId: s.stopId, state: 'boarded', at: new Date().toISOString() });
       }
     });
-    setJustCompletedStopName(completedName);
-    setTimeout(() => setJustCompletedStopName(null), 1200);
   };
+
+  const onDepart = () => {
+    if (!activeStop) return;
+    const name = activeStop.name;
+    runStopAction({ kind: 'depart', stopId: activeStop.id }, () => {
+      setJustCompletedStopName(name);
+      setTimeout(() => setJustCompletedStopName(null), 1200);
+    });
+  };
+  const pending = stopAction.isPending || tripStops.isLoading;
 
   const onNavigate = () => {
     if (!activeStop) return;
@@ -277,13 +281,14 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
               </View>
               <IconBtn testID="navigate-btn" icon="location" label={t('trip.navigate')} onPress={onNavigate} color={colors.primary} />
             </View>
-            {gpsUnavailable && progress.state === 'EN_ROUTE' && (
+            {progress.state === 'EN_ROUTE' && (
               <Btn
-                testID="manual-arrived-btn"
-                label={t('trip.arrivedManualFallback')}
+                testID="arrived-btn"
+                label={t('trip.arrived')}
                 icon="location"
-                variant="ghost"
-                onPress={progress.markArrivedManually}
+                onPress={() => activeStop && runStopAction({ kind: 'arrive', stopId: activeStop.id })}
+                loading={stopAction.isPending && stopAction.variables?.kind === 'arrive'}
+                disabled={pending}
                 style={styles.markPickedUpBtn}
               />
             )}
@@ -303,6 +308,21 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
                   onPress={onMarkPickedUp}
                   style={styles.markPickedUpBtn}
                 />
+                <Btn
+                  testID="depart-stop-btn"
+                  label={t('trip.departStop')}
+                  icon="route"
+                  variant="ghost"
+                  onPress={onDepart}
+                  loading={stopAction.isPending && stopAction.variables?.kind === 'depart'}
+                  disabled={pending || !progress.canDepart}
+                  style={styles.markPickedUpBtn}
+                />
+                {!progress.canDepart && (
+                  <Text testID="depart-hint" style={[TextScale.caption, { color: colors.inkSoft, marginTop: 4 }]}>
+                    {t('trip.departHint')}
+                  </Text>
+                )}
               </>
             )}
             <Pressable
@@ -335,11 +355,35 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
             )}
           </View>
         )}
-        {progress.state === 'ROUTE_COMPLETED' && (
+        {progress.state === 'ROUTE_COMPLETED' && stops.length > 0 && (
           <View style={styles.nextStopCard}>
             <Text style={[TextScale.cardTitle, { color: colors.ink }]}>{t('trip.routeCompleteTitle')}</Text>
-            <Text style={[TextScale.caption, { color: colors.inkSoft, marginTop: 4 }]}>{t('trip.routeCompleteHint')}</Text>
+            {current.data?.direction === 'pickup' && !progress.schoolArrived ? (
+              <Btn
+                testID="school-arrived-btn"
+                label={t('trip.schoolArrived')}
+                icon="check"
+                onPress={() => runStopAction({ kind: 'school' })}
+                loading={stopAction.isPending}
+                disabled={pending}
+                style={styles.markPickedUpBtn}
+              />
+            ) : (
+              <>
+                <Text style={[TextScale.caption, { color: colors.inkSoft, marginTop: 4 }]}>{t('trip.endFromTripHint')}</Text>
+                <Btn
+                  testID="back-to-trip-btn"
+                  label={t('trip.backToTrip')}
+                  variant="ghost"
+                  onPress={() => navigation.goBack()}
+                  style={styles.markPickedUpBtn}
+                />
+              </>
+            )}
           </View>
+        )}
+        {stopError && (
+          <Text testID="stop-action-error" style={[TextScale.caption, { color: colors.danger }]}>{stopError}</Text>
         )}
       </View>
     </View>

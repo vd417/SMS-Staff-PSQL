@@ -9,8 +9,6 @@ jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock
 jest.mock('expo-location', () => ({
   requestForegroundPermissionsAsync: jest.fn(async () => ({ status: 'granted' })),
   watchPositionAsync: jest.fn(async (_opts, cb) => {
-    // Unambiguously nearer to s1 (Gate, 12.1/77.1) than s2 (Market, 12.2/77.2),
-    // so s1 resolves as the current stop and s2 as the next one.
     cb({ coords: { latitude: 12.11, longitude: 77.11 } });
     return { remove: jest.fn() };
   }),
@@ -33,17 +31,18 @@ const mockAssignment = {
   refetch: jest.fn(),
 };
 const mockCurrent = { data: { id: 't1', routeId: 'r1', busNo: 'KA-01', driverId: 'd1', direction: 'pickup', status: 'live' }, isLoading: false };
-// s2 (Market) has one assigned student, unresolved — that's what makes it
-// the "active" stop under findActiveStop's derivation (s1/Gate has none,
-// so it's vacuously resolved and skipped).
 const mockRoster = { data: [{ id: 'st1', name: 'Riya', stopId: 's2' }] as any[] };
 const mockBoarding = { data: [] as any[], setBoarding: { mutate: jest.fn() } };
+const mockStops = { data: undefined as any, isLoading: false };
+const mockAction = { mutate: jest.fn(), isPending: false, variables: undefined as any };
 
 jest.mock('@/features/trip/hooks', () => ({
   useTripAssignment: () => mockAssignment,
   useCurrentTrip: () => mockCurrent,
   useRoster: () => mockRoster,
   useBoarding: () => mockBoarding,
+  useTripStops: () => mockStops,
+  useStopActions: () => mockAction,
 }));
 
 jest.mock('@/features/trip/useRouteGeometry', () => ({
@@ -68,6 +67,15 @@ jest.mock('@/features/map/LiveMapView', () => {
   return { LiveMapView };
 });
 
+const renderScreen = () =>
+  render(
+    <ThemeProvider>
+      <ToastProvider>
+        <LiveMapScreen navigation={{ goBack: jest.fn() }} route={{ params: { tripId: 't1' } }} />
+      </ToastProvider>
+    </ThemeProvider>
+  );
+
 describe('LiveMapScreen', () => {
   const originalStops = mockAssignment.data.route.stops;
 
@@ -77,42 +85,38 @@ describe('LiveMapScreen', () => {
     mockAssignment.data.route.stops = originalStops;
     mockRoster.data = [{ id: 'st1', name: 'Riya', stopId: 's2' }];
     mockBoarding.data = [];
+    mockStops.data = {
+      tripId: 't1',
+      currentStopId: null,
+      schoolArrivedAt: null,
+      stops: [
+        { stopId: 's1', name: 'Gate', seq: 1 },
+        { stopId: 's2', name: 'Market', seq: 2 },
+      ],
+    };
+    mockAction.mutate.mockReset();
+    mockAction.isPending = false;
+    mockAction.variables = undefined;
+    mockCurrent.data.direction = 'pickup';
   });
 
   it('renders a compact header with the bus number, direction, route name and a LIVE status pill', async () => {
-    const { getByText, getAllByText } = render(
-      <ThemeProvider>
-        <ToastProvider>
-          <LiveMapScreen navigation={{ goBack: jest.fn() }} route={{ params: { tripId: 't1' } }} />
-        </ToastProvider>
-      </ThemeProvider>
-    );
+    const { getByText, getAllByText } = renderScreen();
     await waitFor(() => expect(getAllByText('LIVE').length).toBeGreaterThan(0));
     expect(getByText('KA-01')).toBeTruthy();
     expect(getByText('Route 1')).toBeTruthy();
   });
 
-  it('shows the next stop with a distance to it once GPS resolves', async () => {
-    const { getByTestId, getByText } = render(
-      <ThemeProvider>
-        <ToastProvider>
-          <LiveMapScreen navigation={{ goBack: jest.fn() }} route={{ params: { tripId: 't1' } }} />
-        </ToastProvider>
-      </ThemeProvider>
-    );
+  it('shows the next (active) stop with a distance to it once GPS resolves', async () => {
+    // currentStopId is null and no stop has departed, so s1 (Gate, seq 1) is active.
+    const { getByTestId, getByText } = renderScreen();
     await waitFor(() => expect(getByTestId('has-live-marker')).toBeTruthy());
-    expect(getByText('Market')).toBeTruthy();
+    expect(getByText('Gate')).toBeTruthy();
     expect(getByTestId('view-students-btn')).toBeTruthy();
   });
 
   it('recenters the map on the live marker when the recenter button is pressed', async () => {
-    const { getByTestId } = render(
-      <ThemeProvider>
-        <ToastProvider>
-          <LiveMapScreen navigation={{ goBack: jest.fn() }} route={{ params: { tripId: 't1' } }} />
-        </ToastProvider>
-      </ThemeProvider>
-    );
+    const { getByTestId } = renderScreen();
     await waitFor(() => expect(getByTestId('has-live-marker')).toBeTruthy());
     fireEvent.press(getByTestId('recenter-btn'));
     expect(mockMapHandle.animateToRegion).toHaveBeenCalledWith(
@@ -122,13 +126,7 @@ describe('LiveMapScreen', () => {
   });
 
   it('renders the map with stops and the live marker once GPS resolves', async () => {
-    const { getByTestId } = render(
-      <ThemeProvider>
-        <ToastProvider>
-          <LiveMapScreen navigation={{ goBack: jest.fn() }} route={{ params: { tripId: 't1' } }} />
-        </ToastProvider>
-      </ThemeProvider>
-    );
+    const { getByTestId } = renderScreen();
     await waitFor(() => expect(getByTestId('has-live-marker')).toBeTruthy());
     expect(getByTestId('stop-count').props.children).toBe(2);
   });
@@ -136,13 +134,7 @@ describe('LiveMapScreen', () => {
   it('shows a toast and still renders stops when location permission is denied', async () => {
     const Location = require('expo-location');
     Location.requestForegroundPermissionsAsync.mockResolvedValueOnce({ status: 'denied' });
-    const { getByTestId, queryByTestId } = render(
-      <ThemeProvider>
-        <ToastProvider>
-          <LiveMapScreen navigation={{ goBack: jest.fn() }} route={{ params: { tripId: 't1' } }} />
-        </ToastProvider>
-      </ThemeProvider>
-    );
+    const { getByTestId, queryByTestId } = renderScreen();
     await waitFor(() => expect(getByTestId('live-map-view')).toBeTruthy());
     expect(queryByTestId('has-live-marker')).toBeNull();
   });
@@ -151,13 +143,7 @@ describe('LiveMapScreen', () => {
     const Location = require('expo-location');
     Location.requestForegroundPermissionsAsync.mockResolvedValueOnce({ status: 'granted' });
     Location.watchPositionAsync.mockRejectedValueOnce(new Error('GPS unavailable'));
-    const { getByTestId, queryByTestId } = render(
-      <ThemeProvider>
-        <ToastProvider>
-          <LiveMapScreen navigation={{ goBack: jest.fn() }} route={{ params: { tripId: 't1' } }} />
-        </ToastProvider>
-      </ThemeProvider>
-    );
+    const { getByTestId, queryByTestId } = renderScreen();
     await waitFor(() => expect(getByTestId('live-map-view')).toBeTruthy());
     expect(queryByTestId('has-live-marker')).toBeNull();
   });
@@ -171,62 +157,94 @@ describe('LiveMapScreen', () => {
     });
     Location.watchPositionAsync.mockImplementationOnce(() => watchPromise);
 
-    const { unmount } = render(
-      <ThemeProvider>
-        <ToastProvider>
-          <LiveMapScreen navigation={{ goBack: jest.fn() }} route={{ params: { tripId: 't1' } }} />
-        </ToastProvider>
-      </ThemeProvider>
-    );
+    const { unmount } = renderScreen();
 
-    // Wait until the effect has progressed past permission checks and called
-    // watchPositionAsync, then unmount before that call resolves.
     await waitFor(() => expect(Location.watchPositionAsync).toHaveBeenCalled());
     unmount();
 
-    // Now let watchPositionAsync resolve with a live subscription.
     resolveWatch!({ remove: removeMock });
     await waitFor(() => expect(removeMock).toHaveBeenCalledTimes(1));
   });
 
-  it('shows the active stop (s2) rather than the GPS-nearest stop (s1)', async () => {
-    // The GPS mock resolves near s1 (Gate), but s1 has no assigned students
-    // (vacuously resolved), so s2 (Market) — which has an unresolved
-    // student — must be the one shown, not s1.
-    const { getByTestId, getByText, queryByText } = render(
-      <ThemeProvider>
-        <ToastProvider>
-          <LiveMapScreen navigation={{ goBack: jest.fn() }} route={{ params: { tripId: 't1' } }} />
-        </ToastProvider>
-      </ThemeProvider>
-    );
+  it('opens the device maps app with the active stop\'s coordinates when Navigate is pressed', async () => {
+    const { Linking } = require('react-native');
+    jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    const { getByTestId } = renderScreen();
     await waitFor(() => expect(getByTestId('has-live-marker')).toBeTruthy());
-    expect(getByText('Market')).toBeTruthy();
-    expect(queryByText('Gate')).toBeNull();
+    fireEvent.press(getByTestId('navigate-btn'));
+    // Active stop is s1 (Gate) by default (currentStopId null, nothing departed).
+    expect(Linking.openURL).toHaveBeenCalledWith(
+      expect.stringContaining('destination=12.1,77.1')
+    );
   });
 
-  it('marks every unresolved student at the active stop as boarded and shows a brief confirmation when "Mark Students Picked Up" is pressed', async () => {
-    // GPS mock resolves at (12.11, 77.11) — within 50m of s2's own coordinates
-    // in this test's fixture, so override mockAssignment's s2 to sit right there.
-    // beforeEach restores the original stops array before the next test runs.
-    mockAssignment.data.route.stops = [
-      { id: 's1', name: 'Gate', lat: 12.1, lng: 77.1, seq: 1 },
-      { id: 's2', name: 'Market', lat: 12.11, lng: 77.11, seq: 2 },
+  it('EN_ROUTE shows Arrived for the next stop and confirms it on tap', async () => {
+    const { findByTestId } = renderScreen();
+    fireEvent.press(await findByTestId('arrived-btn'));
+    expect(mockAction.mutate).toHaveBeenCalledWith({ kind: 'arrive', stopId: 's1' }, expect.any(Object));
+  });
+
+  it('shows the too_far message inline', async () => {
+    mockAction.mutate.mockImplementation((_a: unknown, opts: any) => opts.onError(new (require('@/lib/errors').AppError)('too_far', 409, 'x')));
+    const { findByTestId } = renderScreen();
+    fireEvent.press(await findByTestId('arrived-btn'));
+    expect((await findByTestId('stop-action-error')).props.children).toBe('Not close enough to the stop yet.');
+  });
+
+  it('shows the no_location message inline', async () => {
+    mockAction.mutate.mockImplementation((_a: unknown, opts: any) => opts.onError(new (require('@/lib/errors').AppError)('no_location', 409, 'x')));
+    const { findByTestId } = renderScreen();
+    fireEvent.press(await findByTestId('arrived-btn'));
+    expect((await findByTestId('stop-action-error')).props.children).toBe('Waiting for GPS location — try again in a moment.');
+  });
+
+  it('PICKUP_IN_PROGRESS disables Depart stop until every student is resolved', async () => {
+    mockStops.data = { ...mockStops.data, currentStopId: 's2' };
+    mockStops.data.stops[0].departedAt = 'x';
+    const { findByTestId, getByTestId } = renderScreen();
+    expect((await findByTestId('depart-stop-btn')).props.accessibilityState?.disabled).toBe(true);
+    expect(getByTestId('depart-hint')).toBeTruthy();
+  });
+
+  it('marks every unresolved student at the active stop as boarded, but does not overwrite one already marked absent', async () => {
+    mockStops.data = { ...mockStops.data, currentStopId: 's2' };
+    mockStops.data.stops[0].departedAt = 'x';
+    mockRoster.data = [
+      { id: 'st1', name: 'Riya', stopId: 's2' },
+      { id: 'st2', name: 'Kabir', stopId: 's2' },
     ];
+    mockBoarding.data = [
+      { tripId: 't1', studentId: 'st2', stopId: 's2', state: 'absent', at: '2026-09-20T00:00:00Z' },
+    ];
+    const { findByTestId } = renderScreen();
+    fireEvent.press(await findByTestId('mark-picked-up-btn'));
+    expect(mockBoarding.setBoarding.mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ tripId: 't1', studentId: 'st1', stopId: 's2', state: 'boarded' })
+    );
+    expect(mockBoarding.setBoarding.mutate).not.toHaveBeenCalledWith(
+      expect.objectContaining({ studentId: 'st2' })
+    );
+    expect(mockAction.mutate).not.toHaveBeenCalled();
+  });
+
+  it('Depart stop calls complete once resolved, and marking pickups never departs by itself', async () => {
+    mockStops.data = { ...mockStops.data, currentStopId: 's2' };
+    mockBoarding.data = [{ tripId: 't1', studentId: 'st1', stopId: 's2', state: 'boarded', at: 'x' }];
+    const { findByTestId } = renderScreen();
+    fireEvent.press(await findByTestId('mark-picked-up-btn'));
+    expect(mockAction.mutate).not.toHaveBeenCalled();
+    fireEvent.press(await findByTestId('depart-stop-btn'));
+    expect(mockAction.mutate).toHaveBeenCalledWith({ kind: 'depart', stopId: 's2' }, expect.any(Object));
+  });
+
+  it('shows a brief confirmation once Depart stop succeeds', async () => {
+    mockStops.data = { ...mockStops.data, currentStopId: 's2' };
+    mockBoarding.data = [{ tripId: 't1', studentId: 'st1', stopId: 's2', state: 'boarded', at: 'x' }];
+    mockAction.mutate.mockImplementation((_a: unknown, opts: any) => opts.onSuccess());
     jest.useFakeTimers();
     try {
-      const { findByTestId, queryByTestId } = render(
-        <ThemeProvider>
-          <ToastProvider>
-            <LiveMapScreen navigation={{ goBack: jest.fn() }} route={{ params: { tripId: 't1' } }} />
-          </ToastProvider>
-        </ThemeProvider>
-      );
-      const markBtn = await findByTestId('mark-picked-up-btn');
-      fireEvent.press(markBtn);
-      expect(mockBoarding.setBoarding.mutate).toHaveBeenCalledWith(
-        expect.objectContaining({ tripId: 't1', studentId: 'st1', stopId: 's2', state: 'boarded' })
-      );
+      const { findByTestId, queryByTestId } = renderScreen();
+      fireEvent.press(await findByTestId('depart-stop-btn'));
       expect(await findByTestId('stop-completed-confirm')).toHaveTextContent('Market', { exact: false });
       await act(async () => {
         jest.advanceTimersByTime(1200);
@@ -237,125 +255,28 @@ describe('LiveMapScreen', () => {
     }
   });
 
-  it('does not overwrite a student already marked "absent" when "Mark Students Picked Up" is pressed, but still boards a student with no record', async () => {
-    mockAssignment.data.route.stops = [
-      { id: 's1', name: 'Gate', lat: 12.1, lng: 77.1, seq: 1 },
-      { id: 's2', name: 'Market', lat: 12.11, lng: 77.11, seq: 2 },
-    ];
-    mockRoster.data = [
-      { id: 'st1', name: 'Riya', stopId: 's2' },
-      { id: 'st2', name: 'Kabir', stopId: 's2' },
-    ];
-    mockBoarding.data = [
-      { tripId: 't1', studentId: 'st2', stopId: 's2', state: 'absent', at: '2026-09-20T00:00:00Z' },
-    ];
-    const { findByTestId } = render(
-      <ThemeProvider>
-        <ToastProvider>
-          <LiveMapScreen navigation={{ goBack: jest.fn() }} route={{ params: { tripId: 't1' } }} />
-        </ToastProvider>
-      </ThemeProvider>
-    );
-    const markBtn = await findByTestId('mark-picked-up-btn');
-    fireEvent.press(markBtn);
-    expect(mockBoarding.setBoarding.mutate).toHaveBeenCalledWith(
-      expect.objectContaining({ tripId: 't1', studentId: 'st1', stopId: 's2', state: 'boarded' })
-    );
-    expect(mockBoarding.setBoarding.mutate).not.toHaveBeenCalledWith(
-      expect.objectContaining({ studentId: 'st2' })
-    );
+  it('ROUTE_COMPLETED on a pickup trip offers Arrived at school', async () => {
+    mockStops.data.stops.forEach((s: any) => { s.departedAt = 'x'; });
+    const { findByTestId } = renderScreen();
+    fireEvent.press(await findByTestId('school-arrived-btn'));
+    expect(mockAction.mutate).toHaveBeenCalledWith({ kind: 'school' }, expect.any(Object));
   });
 
-  it('shows a manual "I\'ve arrived" fallback button and advances pickup state when GPS is unavailable', async () => {
-    const Location = require('expo-location');
-    Location.requestForegroundPermissionsAsync.mockResolvedValueOnce({ status: 'denied' });
-    const { getByTestId } = render(
-      <ThemeProvider>
-        <ToastProvider>
-          <LiveMapScreen navigation={{ goBack: jest.fn() }} route={{ params: { tripId: 't1' } }} />
-        </ToastProvider>
-      </ThemeProvider>
-    );
-    const arrivedBtn = await waitFor(() => getByTestId('manual-arrived-btn'));
-    fireEvent.press(arrivedBtn);
-    expect(await waitFor(() => getByTestId('mark-picked-up-btn'))).toBeTruthy();
+  it('ROUTE_COMPLETED on a drop trip goes back to the Trip screen to end it', async () => {
+    mockCurrent.data.direction = 'drop';
+    mockStops.data.stops.forEach((s: any) => { s.departedAt = 'x'; });
+    const { findByTestId, queryByTestId } = renderScreen();
+    expect(await findByTestId('back-to-trip-btn')).toBeTruthy();
+    expect(queryByTestId('school-arrived-btn')).toBeNull();
   });
 
-  it('does not show the manual "I\'ve arrived" fallback button when GPS is available', async () => {
-    const { getByTestId, queryByTestId } = render(
-      <ThemeProvider>
-        <ToastProvider>
-          <LiveMapScreen navigation={{ goBack: jest.fn() }} route={{ params: { tripId: 't1' } }} />
-        </ToastProvider>
-      </ThemeProvider>
-    );
-    await waitFor(() => expect(getByTestId('has-live-marker')).toBeTruthy());
-    expect(queryByTestId('manual-arrived-btn')).toBeNull();
-  });
-
-  it('shows the manual "I\'ve arrived" fallback after a timeout when GPS permission is granted but no fix ever arrives', async () => {
-    jest.useFakeTimers();
-    try {
-      const Location = require('expo-location');
-      Location.watchPositionAsync.mockImplementationOnce(async (_opts: any, _cb: any) => {
-        // Resolves successfully but never invokes the position callback —
-        // simulates a subscription that never delivers a fix.
-        return { remove: jest.fn() };
-      });
-      const { queryByTestId } = render(
-        <ThemeProvider>
-          <ToastProvider>
-            <LiveMapScreen navigation={{ goBack: jest.fn() }} route={{ params: { tripId: 't1' } }} />
-          </ToastProvider>
-        </ThemeProvider>
-      );
-
-      // Let the permission/subscribe promise chain resolve before advancing timers.
-      await act(async () => {
-        await Promise.resolve();
-        await Promise.resolve();
-      });
-      expect(queryByTestId('manual-arrived-btn')).toBeNull();
-
-      await act(async () => {
-        jest.advanceTimersByTime(15000);
-      });
-
-      expect(queryByTestId('manual-arrived-btn')).toBeTruthy();
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
-  it('opens the device maps app with the active stop\'s coordinates when Navigate is pressed', async () => {
-    const { Linking } = require('react-native');
-    jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
-    const { getByTestId } = render(
-      <ThemeProvider>
-        <ToastProvider>
-          <LiveMapScreen navigation={{ goBack: jest.fn() }} route={{ params: { tripId: 't1' } }} />
-        </ToastProvider>
-      </ThemeProvider>
-    );
-    await waitFor(() => expect(getByTestId('has-live-marker')).toBeTruthy());
-    fireEvent.press(getByTestId('navigate-btn'));
-    expect(Linking.openURL).toHaveBeenCalledWith(
-      expect.stringContaining('destination=12.2,77.2')
-    );
-  });
-
-  it('shows a Route Complete summary once every stop is resolved', async () => {
-    mockBoarding.data = [
-      { tripId: 't1', studentId: 'st1', stopId: 's2', state: 'boarded', at: '2026-09-20T00:00:00Z' },
-    ];
-    const { getByText, queryByTestId } = render(
-      <ThemeProvider>
-        <ToastProvider>
-          <LiveMapScreen navigation={{ goBack: jest.fn() }} route={{ params: { tripId: 't1' } }} />
-        </ToastProvider>
-      </ThemeProvider>
-    );
-    await waitFor(() => expect(getByText('Route complete')).toBeTruthy());
-    expect(queryByTestId('mark-picked-up-btn')).toBeNull();
+  it('does not show the route-complete card (or its Arrived-at-school button) while stops is still empty', async () => {
+    mockAssignment.data.route.stops = [];
+    const { queryByTestId } = renderScreen();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(queryByTestId('school-arrived-btn')).toBeNull();
+    expect(queryByTestId('back-to-trip-btn')).toBeNull();
   });
 });
