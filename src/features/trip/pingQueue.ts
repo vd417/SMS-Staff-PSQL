@@ -69,6 +69,26 @@ export async function createPersistedPingBuffer<T>(
 ): Promise<PersistedPingBuffer<T>> {
   let queue: T[] = (await asyncStore.get<T[]>(storageKey)) ?? [];
   const persist = () => asyncStore.set(storageKey, queue);
+  // A slow POST (no client-side timeout) can outlast the 10 s ping cadence, so a second
+  // flush() can be requested while one is still running. Without this guard, both calls
+  // would slice the same queue.slice(0, batchSize): duplicate sends, and the second flush's
+  // `queue = queue.slice(batch.length)` drops whatever the first flush hadn't sent yet.
+  // Single-flighting flush() means only one run() loop is ever in progress, and its
+  // `while (queue.length)` loop picks up anything enqueued while it was running.
+  let inFlight: Promise<void> | null = null;
+
+  async function run(): Promise<void> {
+    while (queue.length > 0) {
+      const batch = queue.slice(0, batchSize);
+      try {
+        await sendBatch(batch);
+      } catch {
+        break;
+      }
+      queue = queue.slice(batch.length);
+      await persist();
+    }
+  }
 
   return {
     async enqueue(item) {
@@ -76,17 +96,11 @@ export async function createPersistedPingBuffer<T>(
       await persist();
     },
     size() { return queue.length; },
-    async flush() {
-      while (queue.length > 0) {
-        const batch = queue.slice(0, batchSize);
-        try {
-          await sendBatch(batch);
-        } catch {
-          break;
-        }
-        queue = queue.slice(batch.length);
-        await persist();
+    flush() {
+      if (!inFlight) {
+        inFlight = run().finally(() => { inFlight = null; });
       }
+      return inFlight;
     },
   };
 }

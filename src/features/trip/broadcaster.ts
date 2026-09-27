@@ -80,13 +80,26 @@ function publishFromLocation(loc: Location.LocationObject): void {
   publish(ping).catch(() => { /* offline — buffer retries on next event */ });
 }
 
+// Two resume effects (TripScreen and LiveMapScreen) can both mount right after a restart and
+// call startBroadcast concurrently — without this guard each would create its own buffer and
+// location watcher, leaking the first watcher. A second call while one is still in progress
+// gets the same in-flight promise instead of starting a second one.
+let starting: Promise<boolean> | null = null;
+
+export function startBroadcast(deps: BroadcastDeps): Promise<boolean> {
+  if (!starting) {
+    starting = startBroadcastImpl(deps).finally(() => { starting = null; });
+  }
+  return starting;
+}
+
 // Returns true if broadcasting started (permissions granted), false otherwise.
 // Background location tasks aren't supported on every platform (e.g. expo-task-manager
 // has no web implementation) — when starting the background stream fails for that reason,
 // fall back to a foreground watcher instead of failing outright. The foreground fallback
 // only reports positions while the tab/app stays open, which is acceptable for web since
 // real drivers use the native app.
-export async function startBroadcast({ tripId, onPings }: BroadcastDeps): Promise<boolean> {
+async function startBroadcastImpl({ tripId, onPings }: BroadcastDeps): Promise<boolean> {
   try {
     const fg = await Location.requestForegroundPermissionsAsync();
     if (fg.status !== 'granted') return false;

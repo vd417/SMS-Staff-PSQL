@@ -55,4 +55,26 @@ describe('createPersistedPingBuffer (survives app kill)', () => {
     await buf.flush();
     expect(buf.size()).toBe(25);
   });
+
+  it('single-flights concurrent flushes so a slow POST cannot double-send or drop a backlog', async () => {
+    const sent: number[][] = [];
+    const sendBatch = async (items: number[]) => {
+      // Long enough that a second flush() call (and a mid-flush enqueue) land before this resolves.
+      await new Promise((r) => setTimeout(r, 20));
+      sent.push(items);
+    };
+    const buf = await createPersistedPingBuffer<number>(sendBatch, 'k.concurrent');
+    for (let i = 0; i < 25; i += 1) await buf.enqueue(i);
+
+    const p1 = buf.flush();
+    const p2 = buf.flush(); // requested while the first batch is still in flight
+    expect(p2).toBe(p1); // same in-flight promise — no second run() loop started
+    await buf.enqueue(25); // enqueued mid-flush; run()'s while loop must still pick it up
+
+    await Promise.all([p1, p2]);
+
+    // Every ping sent exactly once, in order, across however many batches it took.
+    expect(sent.flat()).toEqual(Array.from({ length: 26 }, (_, i) => i));
+    expect(buf.size()).toBe(0);
+  });
 });

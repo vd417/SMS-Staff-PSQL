@@ -40,8 +40,8 @@ const mockBroadcaster = broadcaster as unknown as {
 // a clean "no active trip" state regardless of run order.
 beforeEach(async () => {
   await AsyncStorage.clear();
-  mockBroadcaster.startBroadcast.mockClear();
-  mockBroadcaster.stopBroadcast.mockClear();
+  mockBroadcaster.startBroadcast.mockReset().mockResolvedValue(true);
+  mockBroadcaster.stopBroadcast.mockReset().mockResolvedValue(undefined);
   mockBroadcaster.isBroadcasting.mockReset().mockReturnValue(false);
   mockBroadcaster.getPersistedBroadcastTripId.mockReset().mockResolvedValue(null);
 });
@@ -164,4 +164,39 @@ it('shows a clear message when the server refuses the start', async () => {
   await findByText(/Route 7/);
   fireEvent.press(await findByTestId('trip-start'));
   expect(await findByText('You are not assigned to this bus.')).toBeTruthy();
+});
+
+it('ends the trip on the server before stopping the broadcast, so a failed end keeps GPS resumable', async () => {
+  const order: string[] = [];
+  const repos = createMockRepositories(await createStore());
+  const originalEndTrip = repos.trip.endTrip.bind(repos.trip);
+  repos.trip.endTrip = async (tripId: string) => {
+    order.push('endTrip');
+    return originalEndTrip(tripId);
+  };
+  mockBroadcaster.stopBroadcast.mockImplementation(async () => { order.push('stopBroadcast'); });
+
+  const { getByTestId, findByText } = await renderScreen(repos);
+  await findByText(/Route 7/);
+  fireEvent.press(getByTestId('trip-start'));
+  await waitFor(() => expect(getByTestId('trip-end')).toBeTruthy());
+  fireEvent.press(getByTestId('trip-end'));
+  await waitFor(() => expect(order).toEqual(['endTrip', 'stopBroadcast']));
+});
+
+it('keeps broadcasting and shows an error toast when ending the trip fails (e.g. offline)', async () => {
+  const { AppError } = require('@/lib/errors');
+  const repos = createMockRepositories(await createStore());
+  const { getByTestId, findByText } = await renderScreen(repos);
+  await findByText(/Route 7/);
+  fireEvent.press(getByTestId('trip-start'));
+  await waitFor(() => expect(getByTestId('trip-end')).toBeTruthy());
+
+  repos.trip.endTrip = jest.fn().mockRejectedValue(new AppError('network', 0, 'offline'));
+  fireEvent.press(getByTestId('trip-end'));
+
+  expect(await findByText('Cannot reach the server. Please check your connection and try again.')).toBeTruthy();
+  expect(mockBroadcaster.stopBroadcast).not.toHaveBeenCalled();
+  // Still on the live-trip screen (not the summary card) — the trip is still active.
+  expect(getByTestId('trip-end')).toBeTruthy();
 });

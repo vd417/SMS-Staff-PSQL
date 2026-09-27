@@ -141,8 +141,19 @@ export const TripScreen = ({ navigation }: { navigation: any }) => {
 
   const onEnd = async () => {
     if (!trip) return;
+    let s: TripSummary;
+    try {
+      // endTrip first: if it fails (offline), the trip stays live server-side and this phone
+      // must keep broadcasting so it can still resume/retry — stopping first would clear the
+      // persisted broadcast id and leave a live trip with no GPS. Any ping still in flight
+      // between endTrip succeeding and stopBroadcast running is rejected 409 trip_ended and
+      // dropped by the broadcaster's permanent-rejection guard, not retried.
+      s = await endTrip.mutateAsync(trip.id);
+    } catch (e) {
+      toast.show(stopActionMessage(e, t), 'error');
+      return;
+    }
     await stopBroadcast().catch(() => {});
-    const s = await endTrip.mutateAsync(trip.id);
     setSummary(s);
   };
 

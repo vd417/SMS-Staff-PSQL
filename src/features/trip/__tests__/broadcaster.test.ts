@@ -88,6 +88,38 @@ describe('startBroadcast', () => {
     expect(JSON.parse(await AsyncStorage.getItem('sms.trip.pingQueue'))).toEqual([]);
     await stopBroadcast();
   });
+
+  it.each([
+    ['a network failure (status 0)', new AppError('network', 0, 'offline')],
+    ['a 5xx server error', new AppError('server_error', 500, 'boom')],
+    ['a 401 (token expired, may succeed after refresh)', new AppError('unauthorized', 401, 'x')],
+    ['a 429 (rate limited, retry later)', new AppError('rate_limited', 429, 'x')],
+  ])('keeps the batch queued on %s', async (_label, error) => {
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    await AsyncStorage.setItem('sms.trip.pingQueue', JSON.stringify([
+      { tripId: 't1', lat: 1, lng: 1, speedKmh: 0, heading: 0, at: 'x' },
+    ]));
+    const onPings = jest.fn().mockRejectedValue(error);
+    await startBroadcast({ tripId: 't1', onPings });
+    expect(onPings).toHaveBeenCalledWith('t1', expect.any(Array));
+    expect(JSON.parse(await AsyncStorage.getItem('sms.trip.pingQueue'))).toEqual([
+      { tripId: 't1', lat: 1, lng: 1, speedKmh: 0, heading: 0, at: 'x' },
+    ]);
+    await stopBroadcast();
+  });
+
+  it('single-flights concurrent startBroadcast calls so a second resume effect cannot leak a watcher', async () => {
+    const onPings = jest.fn(async () => {});
+    const [ok1, ok2] = await Promise.all([
+      startBroadcast({ tripId: 't1', onPings }),
+      startBroadcast({ tripId: 't1', onPings }),
+    ]);
+    expect(ok1).toBe(true);
+    expect(ok2).toBe(true);
+    // Only one location watcher was ever created, not two.
+    expect(mockWatchPositionAsync).toHaveBeenCalledTimes(1);
+    await stopBroadcast();
+  });
 });
 
 describe('stopBroadcast', () => {
