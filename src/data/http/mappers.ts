@@ -1,5 +1,5 @@
 import type { Session, Staff, Tenant, Dashboard, RoleCard, Attendance, AttendanceLog, SchoolLocation, TaskPeek,
-  Route, Stop, Trip, TripSummary, StudentLite, Boarding, TripAssignment,
+  Route, Stop, Trip, TripSummary, StudentLite, Boarding, TripAssignment, TripStops,
   TripDirection, TripStatus, BoardingState,
   Task, LeaveSummary, LeaveBalance, LeaveRequest, NewLeaveRequest,
   Profile, StaffDocument,
@@ -178,6 +178,19 @@ export const toBoarding = (d: BoardingDTO): Boarding => ({ tripId: d.trip_id, st
 export const toTripAssignment = (d: TripAssignmentDTO): TripAssignment => ({
   route: toRoute(d.route), busId: d.bus_id, busNo: d.bus_no, driverName: d.driver_name ?? null,
   conductorName: d.conductor_name ?? null, shift: d.shift ?? undefined, studentsAssigned: d.students_assigned,
+});
+
+export interface TripStopsDTO {
+  trip_id: string; current_stop_id: string | null; school_arrived_at: string | null;
+  stops: Array<{ stop_id: string; name: string; seq: number; arrived_at?: string; confirmed_at?: string; departed_at?: string }>;
+}
+export const toTripStops = (d: TripStopsDTO): TripStops => ({
+  tripId: d.trip_id,
+  currentStopId: d.current_stop_id,
+  schoolArrivedAt: d.school_arrived_at,
+  stops: d.stops.map((s) => ({
+    stopId: s.stop_id, name: s.name, seq: s.seq, arrivedAt: s.arrived_at, confirmedAt: s.confirmed_at, departedAt: s.departed_at,
+  })),
 });
 
 export interface TaskDTO { id: string; title: string; detail?: string; priority: 'urgent' | 'normal'; done: boolean; due_label?: string; photo_url?: string; }

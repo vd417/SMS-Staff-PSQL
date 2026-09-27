@@ -18,6 +18,8 @@ export interface Store {
   currentTrip: Trip | null;
   boarding: Boarding[];
   pings: TripPing[];
+  /** In-memory stop progress for the current mock trip (not persisted). */
+  tripStops: { currentStopId: string | null; schoolArrivedAt: string | null; arrived: Record<string, string>; departed: Record<string, string> };
   tasks: Task[];
   issues: Issue[];
   vehicleInspections: VehicleInspection[];
@@ -64,6 +66,7 @@ export async function createStore(): Promise<Store> {
     currentTrip,
     boarding,
     pings: [],
+    tripStops: { currentStopId: null, schoolArrivedAt: null, arrived: {}, departed: {} },
     tasks: clone(seed.tasks),
     issues: [],
     vehicleInspections: [],

@@ -37,3 +37,13 @@ export const rosterSchema = z.array(z.object({ id: z.string(), name: z.string(),
 export const boardingListSchema = z.array(z.object({
   trip_id: z.string(), student_id: z.string(), stop_id: orEmpty, state: z.enum(['boarded', 'dropped', 'absent']), at: z.string(),
 }));
+
+export const tripStopsSchema = z.object({
+  trip_id: z.string(),
+  current_stop_id: z.string().nullish().transform((v) => v ?? null),
+  school_arrived_at: z.string().nullish().transform((v) => v ?? null),
+  stops: z.array(z.object({
+    stop_id: z.string(), name: z.string(), seq: z.number(),
+    arrived_at: opt(z.string()), confirmed_at: opt(z.string()), departed_at: opt(z.string()),
+  })),
+});

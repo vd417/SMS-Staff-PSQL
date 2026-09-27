@@ -1,9 +1,9 @@
 import type { TripRepository } from '@/data/repositories/types';
 import type { TripPing, Boarding, TripDirection } from '@/data/domain';
 import type { HttpClient } from '@/lib/httpClient';
-import { toTripAssignment, toTrip, toTripSummary, toStudentLite, toBoarding } from './mappers';
+import { toTripAssignment, toTrip, toTripSummary, toStudentLite, toBoarding, toTripStops } from './mappers';
 import { parseWire } from './schemas/wire';
-import { tripAssignmentSchema, tripSchema, tripSummarySchema, rosterSchema, boardingListSchema } from './schemas/trip.schema';
+import { tripAssignmentSchema, tripSchema, tripSummarySchema, rosterSchema, boardingListSchema, tripStopsSchema } from './schemas/trip.schema';
 
 export function httpTrip(http: HttpClient): TripRepository {
   return {
@@ -33,5 +33,13 @@ export function httpTrip(http: HttpClient): TripRepository {
         .then(() => undefined),
     boardingState: (tripId: string) =>
       http.get(`/staff/trips/${tripId}/boarding`).then((d) => parseWire(boardingListSchema, d, 'boarding').map(toBoarding)),
+    stops: (tripId: string) =>
+      http.get(`/staff/trips/${tripId}/stops`).then((d) => toTripStops(parseWire(tripStopsSchema, d, 'trip stops'))),
+    confirmArrival: (tripId: string, stopId: string) =>
+      http.post<void>(`/staff/trips/${tripId}/stops/${stopId}/confirm-arrival`).then(() => undefined),
+    departStop: (tripId: string, stopId: string) =>
+      http.post<void>(`/staff/trips/${tripId}/stops/${stopId}/complete`).then(() => undefined),
+    markSchoolArrived: (tripId: string) =>
+      http.post<void>(`/staff/trips/${tripId}/school-arrived`).then(() => undefined),
   };
 }

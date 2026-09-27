@@ -76,6 +76,23 @@ export interface TripAssignment {
   studentsAssigned: number;
 }
 
+export interface TripStopState {
+  stopId: string;
+  name: string;
+  seq: number;
+  arrivedAt?: string;
+  confirmedAt?: string;
+  departedAt?: string;
+}
+
+/** Server-authoritative stop progress for one trip (sms-api TripStopProgress). */
+export interface TripStops {
+  tripId: string;
+  currentStopId: string | null;
+  schoolArrivedAt: string | null;
+  stops: TripStopState[];
+}
+
 export interface RouteGeometry {
   routeId: string;
   status: 'available' | 'unavailable';

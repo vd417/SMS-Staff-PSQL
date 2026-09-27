@@ -1,6 +1,6 @@
 import type {
   Session, Staff, Dashboard, Attendance, SchoolLocation,
-  TripAssignment, Trip, TripPing, TripSummary, StudentLite, Boarding, TripDirection, RouteGeometry,
+  TripAssignment, Trip, TripPing, TripSummary, StudentLite, Boarding, TripDirection, RouteGeometry, TripStops,
   Task,
   LeaveSummary, LeaveRequest, NewLeaveRequest,
   Profile,
@@ -45,6 +45,10 @@ export interface TripRepository {
   roster(tripId: string): Promise<StudentLite[]>;
   setBoarding(b: Boarding): Promise<void>;
   boardingState(tripId: string): Promise<Boarding[]>;
+  stops(tripId: string): Promise<TripStops>;
+  confirmArrival(tripId: string, stopId: string): Promise<void>;
+  departStop(tripId: string, stopId: string): Promise<void>;
+  markSchoolArrived(tripId: string): Promise<void>;
 }
 
 export interface TasksRepository {
