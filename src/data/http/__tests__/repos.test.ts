@@ -17,7 +17,7 @@ function fakeHttp(routes: Record<string, unknown>): { http: HttpClient; calls: A
   return { http, calls };
 }
 
-const meDTO = { id: 's1', tenant_id: 't1', name: 'R K', email: 'r@x.com', phone: '9876543210', employee: 'E', joined: '2020-01-01', tenant_name: 'School' };
+const meDTO = { id: 's1', tenant_id: 't1', name: 'R K', email: 'r@x.com', phone: '9876543210', employee: 'E', joined: '2020-01-01', tenant_name: 'School', role_key: 'driver' };
 
 describe('http repositories', () => {
   it('auth.requestOtp posts the identifier and masks the destination', async () => {
@@ -71,17 +71,17 @@ describe('http repositories', () => {
     expect(meCall?.[1]?.headers?.Authorization).toBe('Bearer fresh-token');
   });
 
-  it('auth.login posts email + password + role, fetches /auth/me, and applies the client-chosen role', async () => {
+  it('auth.login posts email + password (no role), fetches /auth/me, and takes the role from role_key', async () => {
     const { http, calls } = fakeHttp({
       'POST /auth/login': { access_token: 'a', refresh_token: 'r' },
       'GET /auth/me': meDTO,
     });
     const session = await httpAuth(http).login('r@x.com', 'hunter2222', 'guard');
     expect(session.accessToken).toBe('a');
-    expect(session.user.roleKey).toBe('guard');
+    expect(session.user.roleKey).toBe('driver');
     expect(calls[0]).toEqual({
       method: 'POST', path: '/auth/login',
-      body: { email: 'r@x.com', password: 'hunter2222', role: 'guard' },
+      body: { email: 'r@x.com', password: 'hunter2222' },
     });
   });
 
@@ -93,7 +93,7 @@ describe('http repositories', () => {
     await httpAuth(http).login('9876543210', 'hunter2222', 'driver');
     expect(calls[0]).toEqual({
       method: 'POST', path: '/auth/login',
-      body: { phone: '9876543210', password: 'hunter2222', role: 'driver' },
+      body: { phone: '9876543210', password: 'hunter2222' },
     });
   });
 

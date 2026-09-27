@@ -102,18 +102,16 @@ describe('toTenantFromMe', () => {
 
 describe('buildLoginRequest', () => {
   it('sends email for an @ identifier', () => {
-    expect(buildLoginRequest('ramesh@example.com', 'hunter2222', 'driver')).toEqual({
+    expect(buildLoginRequest('ramesh@example.com', 'hunter2222')).toEqual({
       email: 'ramesh@example.com',
       password: 'hunter2222',
-      role: 'driver',
     });
   });
 
   it('sends phone for a non-@ identifier', () => {
-    expect(buildLoginRequest('9876543210', 'hunter2222', 'guard')).toEqual({
+    expect(buildLoginRequest('9876543210', 'hunter2222')).toEqual({
       phone: '9876543210',
       password: 'hunter2222',
-      role: 'guard',
     });
   });
 });

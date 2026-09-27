@@ -21,7 +21,7 @@ function fixtureHttp(): HttpClient {
   const meDTO = {
     id: 'staff_ramesh', tenant_id: 'school_greenfield', name: 'Ramesh Kumar',
     email: 'ramesh@example.com', phone: '98765 43210', employee: 'EMP-2041',
-    joined: '2019-06-12', tenant_name: 'Greenfield Public School',
+    joined: '2019-06-12', tenant_name: 'Greenfield Public School', role_key: 'driver',
   };
   const attendanceDTO = { checked_in: false, last_log: [], duty_post: 'Bus / Route', geofence_radius_m: 120 };
   const routes: Record<string, unknown> = {

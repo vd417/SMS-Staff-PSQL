@@ -70,12 +70,14 @@ export function maskIdentifier(identifier: string): string {
   return `${'•'.repeat(Math.max(identifier.length - 4, 0))}${tail}`;
 }
 
-/** Builds the snake_case /auth/login body: email XOR phone, never both. */
+/**
+ * Builds the snake_case /auth/login body: email XOR phone, never both. No `role`: sms-api
+ * provisions staff logins with only the generic `staff` role, so any duty role here would
+ * 403 wrong_role. The duty role comes from /auth/me's role_key instead.
+ */
 export function buildLoginRequest(
   identifier: string,
   password: string,
-  roleKey: Role,
-): { email?: string; phone?: string; password: string; role: string } {
-  const base = { password, role: roleKey };
-  return identifier.includes('@') ? { ...base, email: identifier } : { ...base, phone: identifier };
+): { email?: string; phone?: string; password: string } {
+  return identifier.includes('@') ? { email: identifier, password } : { phone: identifier, password };
 }
