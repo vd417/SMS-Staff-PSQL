@@ -133,7 +133,7 @@ describe('http repositories', () => {
     expect(calls[0]).toEqual({
       method: 'POST',
       path: '/staff/attendance/check-in',
-      body: { at: '2026-06-03T08:00:00Z', lat: 28.4595, lng: 77.0266, accuracy_meters: 8 },
+      body: { at: '2026-06-03T08:00:00Z', lat: 28.4595, lng: 77.0266, accuracy_meters: 8, offset_minutes: -new Date().getTimezoneOffset() },
     });
   });
 
@@ -148,7 +148,7 @@ describe('http repositories', () => {
     expect(calls[0]).toEqual({
       method: 'POST',
       path: '/staff/attendance/check-out',
-      body: { at: '2026-06-03T15:30:00Z', lat: 28.4595, lng: 77.0266, accuracy_meters: 8 },
+      body: { at: '2026-06-03T15:30:00Z', lat: 28.4595, lng: 77.0266, accuracy_meters: 8, offset_minutes: -new Date().getTimezoneOffset() },
     });
   });
 

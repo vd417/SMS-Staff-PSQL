@@ -7,13 +7,15 @@ export interface CardProps {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   padded?: boolean;
+  testID?: string;
 }
 
-export const Card: React.FC<CardProps> = ({ children, style, padded = true }) => {
+export const Card: React.FC<CardProps> = ({ children, style, padded = true, testID }) => {
   const { colors } = useTheme();
 
   return (
     <View
+      testID={testID}
       style={[
         styles.card,
         {

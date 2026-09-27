@@ -17,8 +17,9 @@ export type RoleCard =
 export interface Dashboard {
   hoursThisWeek: number;
   hoursTarget: number;
-  streakDays: number;
-  leaveLeft: number;
+  /** Undefined when the server has no data source for it (sms-api doesn't compute these). */
+  streakDays?: number;
+  leaveLeft?: number;
   roleCard: RoleCard | null;
   pendingTasksPeek: TaskPeek[];
   alert?: string;

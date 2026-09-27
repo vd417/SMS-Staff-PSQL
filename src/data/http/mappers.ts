@@ -116,8 +116,8 @@ export function toDashboard(d: DashboardDTO): Dashboard {
   return {
     hoursThisWeek: d.hours_this_week,
     hoursTarget: d.hours_target ?? 0,
-    streakDays: d.streak_days ?? 0,
-    leaveLeft: d.leave_left ?? 0,
+    streakDays: d.streak_days,
+    leaveLeft: d.leave_left,
     roleCard: d.role_card ? toRoleCard(d.role_card) : null,
     pendingTasksPeek: d.pending_tasks_peek ?? [],
     alert: d.alert,

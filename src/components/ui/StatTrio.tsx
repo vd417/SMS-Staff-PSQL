@@ -11,8 +11,8 @@ import { Icon } from '@/components/icons';
 export interface StatTrioProps {
   hoursThisWeek: number;
   hoursTarget: number;
-  streakDays: number;
-  leaveLeft: number;
+  streakDays?: number;
+  leaveLeft?: number;
 }
 
 export const StatTrio: React.FC<StatTrioProps> = ({
@@ -38,37 +38,43 @@ export const StatTrio: React.FC<StatTrioProps> = ({
       </Card>
 
       {/* Streak + Leave stats */}
-      <View style={styles.statColumn}>
-        {/* Streak */}
-        <Card style={styles.statCard}>
-          <View style={styles.statRow}>
-            <Icon name="fire" size={20} color={colors.gold} strokeWidth={2} />
-            <View style={styles.statText}>
-              <Text style={[TextScale.cardTitle, { color: colors.ink }]}>
-                {t('home.streakDays', { n: streakDays })}
-              </Text>
-              <Text style={[TextScale.caption, { color: colors.inkSoft }]}>
-                {t('home.streak')}
-              </Text>
-            </View>
-          </View>
-        </Card>
+      {(streakDays !== undefined || leaveLeft !== undefined) && (
+        <View style={styles.statColumn}>
+          {/* Streak */}
+          {streakDays !== undefined && (
+            <Card testID="stat-streak" style={styles.statCard}>
+              <View style={styles.statRow}>
+                <Icon name="fire" size={20} color={colors.gold} strokeWidth={2} />
+                <View style={styles.statText}>
+                  <Text style={[TextScale.cardTitle, { color: colors.ink }]}>
+                    {t('home.streakDays', { n: streakDays })}
+                  </Text>
+                  <Text style={[TextScale.caption, { color: colors.inkSoft }]}>
+                    {t('home.streak')}
+                  </Text>
+                </View>
+              </View>
+            </Card>
+          )}
 
-        {/* Leave left */}
-        <Card style={styles.statCard}>
-          <View style={styles.statRow}>
-            <Icon name="gift" size={20} color={colors.primary} strokeWidth={2} />
-            <View style={styles.statText}>
-              <Text style={[TextScale.cardTitle, { color: colors.ink }]}>
-                {t('home.leaveLeftN', { n: leaveLeft })}
-              </Text>
-              <Text style={[TextScale.caption, { color: colors.inkSoft }]}>
-                {t('home.leaveLeft')}
-              </Text>
-            </View>
-          </View>
-        </Card>
-      </View>
+          {/* Leave left */}
+          {leaveLeft !== undefined && (
+            <Card testID="stat-leave" style={styles.statCard}>
+              <View style={styles.statRow}>
+                <Icon name="gift" size={20} color={colors.primary} strokeWidth={2} />
+                <View style={styles.statText}>
+                  <Text style={[TextScale.cardTitle, { color: colors.ink }]}>
+                    {t('home.leaveLeftN', { n: leaveLeft })}
+                  </Text>
+                  <Text style={[TextScale.caption, { color: colors.inkSoft }]}>
+                    {t('home.leaveLeft')}
+                  </Text>
+                </View>
+              </View>
+            </Card>
+          )}
+        </View>
+      )}
     </View>
   );
 };
