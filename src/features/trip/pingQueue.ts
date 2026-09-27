@@ -60,12 +60,12 @@ export interface PersistedPingBuffer<T> {
   size(): number;
 }
 
-// Same FIFO semantics as createPingBuffer, but the queue is mirrored to disk on every
-// mutation so a killed app process (network down, OS reclaim) doesn't silently drop GPS
-// pings — the next startBroadcast() call rehydrates from storageKey before resuming.
+// Same FIFO semantics as createPingBuffer, but mirrored to disk on every mutation so a killed
+// app doesn't drop GPS pings, and flushed in batches (sms-api's pings endpoint is batch-only).
 export async function createPersistedPingBuffer<T>(
-  send: (item: T) => Promise<void>,
+  sendBatch: (items: T[]) => Promise<void>,
   storageKey: string,
+  batchSize = 20,
 ): Promise<PersistedPingBuffer<T>> {
   let queue: T[] = (await asyncStore.get<T[]>(storageKey)) ?? [];
   const persist = () => asyncStore.set(storageKey, queue);
@@ -77,18 +77,16 @@ export async function createPersistedPingBuffer<T>(
     },
     size() { return queue.length; },
     async flush() {
-      const pending = [...queue];
-      const remaining: T[] = [];
-      for (let i = 0; i < pending.length; i += 1) {
+      while (queue.length > 0) {
+        const batch = queue.slice(0, batchSize);
         try {
-          await send(pending[i]);
+          await sendBatch(batch);
         } catch {
-          remaining.push(...pending.slice(i));
           break;
         }
+        queue = queue.slice(batch.length);
+        await persist();
       }
-      queue = remaining;
-      await persist();
     },
   };
 }

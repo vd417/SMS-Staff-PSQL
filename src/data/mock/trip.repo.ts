@@ -55,11 +55,11 @@ export function mockTrip(store: Store): TripRepository {
       return clone(trip);
     },
 
-    async publishPing(ping: TripPing): Promise<void> {
+    async publishPings(_tripId: string, pings: TripPing[]): Promise<void> {
       await simulateLatency();
-      if (!store.currentTrip || (store.currentTrip.status !== 'live' && store.currentTrip.status !== 'arrived')) return;
-      store.pings.push(ping);
-      if (store.pings.length > 500) store.pings.shift();
+      if (!store.currentTrip || store.currentTrip.status === 'ended') return;
+      store.pings.push(...pings);
+      if (store.pings.length > 500) store.pings.splice(0, store.pings.length - 500);
     },
 
     async endTrip(tripId: string): Promise<TripSummary> {

@@ -28,12 +28,31 @@ describe('createPersistedPingBuffer (survives app kill)', () => {
   });
 
   it('clears persisted storage once a flush succeeds', async () => {
-    const sent: number[] = [];
-    const buf = await createPersistedPingBuffer(async (p: { n: number }) => { sent.push(p.n); }, KEY);
-    await buf.enqueue({ n: 1 });
+    const sent: number[][] = [];
+    const buf = await createPersistedPingBuffer(async (items: number[]) => { sent.push(items); }, KEY);
+    await buf.enqueue(1);
     await buf.flush();
 
     const rehydrated = await createPersistedPingBuffer(async () => {}, KEY);
     expect(rehydrated.size()).toBe(0);
+  });
+
+  it('flushes in batches of at most 20, keeping unsent batches on failure', async () => {
+    const sent: number[][] = [];
+    let failNext = false;
+    const buf = await createPersistedPingBuffer<number>(async (items) => {
+      if (failNext) throw new Error('offline');
+      sent.push(items);
+    }, 'k.batch');
+    for (let i = 0; i < 45; i += 1) await buf.enqueue(i);
+    // enqueue does not flush by itself
+    await buf.flush();
+    expect(sent.map((b) => b.length)).toEqual([20, 20, 5]);
+    expect(buf.size()).toBe(0);
+
+    for (let i = 0; i < 25; i += 1) await buf.enqueue(i);
+    failNext = true;
+    await buf.flush();
+    expect(buf.size()).toBe(25);
   });
 });

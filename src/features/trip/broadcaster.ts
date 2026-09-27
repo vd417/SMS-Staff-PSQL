@@ -2,8 +2,11 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import type { TripPing } from '@/data/domain';
 import { shouldPublish, createPersistedPingBuffer, type Sample } from './pingQueue';
+import { asyncStore } from '@/lib/asyncStore';
+import { isAppError } from '@/lib/errors';
 
 const PING_QUEUE_KEY = 'sms.trip.pingQueue';
+const BROADCAST_TRIP_KEY = 'sms.trip.broadcastingTripId';
 
 export const TRIP_LOCATION_TASK = 'sms-trip-location';
 const CADENCE_MS = 10_000;
@@ -36,8 +39,30 @@ TaskManager.defineTask(TRIP_LOCATION_TASK, async ({ data, error }) => {
 
 export interface BroadcastDeps {
   tripId: string;
-  onPing: (ping: TripPing) => Promise<void>;
+  onPings: (tripId: string, pings: TripPing[]) => Promise<void>;
 }
+
+// A 4xx other than 401/429 (trip_ended, not your trip, validation) will never succeed on
+// retry — drop that trip's pings so they can't wedge the queue ahead of the new trip's.
+const isPermanent = (err: unknown) =>
+  isAppError(err) && err.status >= 400 && err.status < 500 && err.status !== 401 && err.status !== 429;
+
+function sendGrouped(onPings: BroadcastDeps['onPings']) {
+  return async (pings: TripPing[]) => {
+    const byTrip = new Map<string, TripPing[]>();
+    for (const p of pings) byTrip.set(p.tripId, [...(byTrip.get(p.tripId) ?? []), p]);
+    for (const [tripId, group] of byTrip) {
+      try {
+        await onPings(tripId, group);
+      } catch (err) {
+        if (!isPermanent(err)) throw err;
+      }
+    }
+  };
+}
+
+export const isBroadcasting = (): boolean => activeTripId !== null;
+export const getPersistedBroadcastTripId = (): Promise<string | null> => asyncStore.get<string>(BROADCAST_TRIP_KEY);
 
 function publishFromLocation(loc: Location.LocationObject): void {
   if (!activeTripId || !publish) return;
@@ -61,17 +86,18 @@ function publishFromLocation(loc: Location.LocationObject): void {
 // fall back to a foreground watcher instead of failing outright. The foreground fallback
 // only reports positions while the tab/app stays open, which is acceptable for web since
 // real drivers use the native app.
-export async function startBroadcast({ tripId, onPing }: BroadcastDeps): Promise<boolean> {
+export async function startBroadcast({ tripId, onPings }: BroadcastDeps): Promise<boolean> {
   try {
     const fg = await Location.requestForegroundPermissionsAsync();
     if (fg.status !== 'granted') return false;
 
     activeTripId = tripId;
     last = null;
-    const buffer = await createPersistedPingBuffer(onPing, PING_QUEUE_KEY);
+    const buffer = await createPersistedPingBuffer(sendGrouped(onPings), PING_QUEUE_KEY);
     // Flush anything left over from a prior run that was killed before it could send.
     await buffer.flush();
     publish = (ping) => buffer.enqueue(ping).then(() => buffer.flush());
+    await asyncStore.set(BROADCAST_TRIP_KEY, tripId);
 
     const bg = await Location.requestBackgroundPermissionsAsync();
     if (bg.status === 'granted') {
@@ -103,6 +129,7 @@ export async function startBroadcast({ tripId, onPing }: BroadcastDeps): Promise
     activeTripId = null;
     publish = null;
     last = null;
+    await asyncStore.remove(BROADCAST_TRIP_KEY).catch(() => {});
     return false;
   }
 }
@@ -121,5 +148,6 @@ export async function stopBroadcast(): Promise<void> {
     publish = null;
     last = null;
     foregroundWatcher = null;
+    await asyncStore.remove(BROADCAST_TRIP_KEY).catch(() => {});
   }
 }

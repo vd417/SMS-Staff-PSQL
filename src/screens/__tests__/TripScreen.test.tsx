@@ -23,7 +23,16 @@ jest.mock('@react-native-async-storage/async-storage', () => {
 jest.mock('@/features/trip/broadcaster', () => ({
   startBroadcast: jest.fn(() => Promise.resolve(true)),
   stopBroadcast: jest.fn(() => Promise.resolve()),
+  isBroadcasting: jest.fn(() => false),
+  getPersistedBroadcastTripId: jest.fn(() => Promise.resolve(null as string | null)),
 }));
+import * as broadcaster from '@/features/trip/broadcaster';
+const mockBroadcaster = broadcaster as unknown as {
+  startBroadcast: jest.Mock;
+  stopBroadcast: jest.Mock;
+  isBroadcasting: jest.Mock;
+  getPersistedBroadcastTripId: jest.Mock;
+};
 
 // The mocked AsyncStorage's backing store persists across tests in this file
 // (the jest.mock factory above runs once per file, not per test) since
@@ -31,10 +40,14 @@ jest.mock('@/features/trip/broadcaster', () => ({
 // a clean "no active trip" state regardless of run order.
 beforeEach(async () => {
   await AsyncStorage.clear();
+  mockBroadcaster.startBroadcast.mockClear();
+  mockBroadcaster.stopBroadcast.mockClear();
+  mockBroadcaster.isBroadcasting.mockReset().mockReturnValue(false);
+  mockBroadcaster.getPersistedBroadcastTripId.mockReset().mockResolvedValue(null);
 });
 
-async function renderScreen() {
-  const repos = createMockRepositories(await createStore());
+async function renderScreen(reposOverride?: ReturnType<typeof createMockRepositories>) {
+  const repos = reposOverride ?? createMockRepositories(await createStore());
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const nav = { goBack: jest.fn(), navigate: jest.fn() };
   const utils = render(
@@ -117,4 +130,38 @@ it('navigates to LiveMap with the current tripId when "View Live Map" is pressed
   const liveTrip = await repos.trip.current();
   fireEvent.press(getByTestId('trip-view-map'));
   expect(nav.navigate).toHaveBeenCalledWith('LiveMap', { tripId: liveTrip!.id });
+});
+
+it('resumes broadcasting for a persisted live trip after an app restart', async () => {
+  // A first "phone" starts the trip; its store persists the live trip via AsyncStorage.
+  const seedRepos = createMockRepositories(await createStore());
+  const started = await seedRepos.trip.startTrip('r1', 'pickup', 'bus');
+  mockBroadcaster.getPersistedBroadcastTripId.mockResolvedValue(started.id);
+
+  // Re-mounting reads that persisted trip back from the (shared, mocked) AsyncStorage,
+  // as a restarted app process would.
+  await renderScreen();
+  await waitFor(() =>
+    expect(mockBroadcaster.startBroadcast).toHaveBeenCalledWith(expect.objectContaining({ tripId: started.id })),
+  );
+});
+
+it('does not start broadcasting on a phone that did not start the trip', async () => {
+  const seedRepos = createMockRepositories(await createStore());
+  await seedRepos.trip.startTrip('r1', 'pickup', 'bus');
+  mockBroadcaster.getPersistedBroadcastTripId.mockResolvedValue(null);
+
+  const { findByText } = await renderScreen();
+  await findByText(/Broadcasting live/);
+  await new Promise((r) => setTimeout(r, 0));
+  expect(mockBroadcaster.startBroadcast).not.toHaveBeenCalled();
+});
+
+it('shows a clear message when the server refuses the start', async () => {
+  const repos = createMockRepositories(await createStore());
+  repos.trip.startTrip = jest.fn().mockRejectedValue(new (require('@/lib/errors').AppError)('not_assigned', 403, 'x'));
+  const { findByTestId, findByText } = await renderScreen(repos);
+  await findByText(/Route 7/);
+  fireEvent.press(await findByTestId('trip-start'));
+  expect(await findByText('You are not assigned to this bus.')).toBeTruthy();
 });

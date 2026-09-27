@@ -40,7 +40,7 @@ export interface TripRepository {
   myAssignment(): Promise<TripAssignment>;
   current(): Promise<Trip | null>;
   startTrip(routeId: string, direction: TripDirection, busNo: string): Promise<Trip>;
-  publishPing(ping: TripPing): Promise<void>;
+  publishPings(tripId: string, pings: TripPing[]): Promise<void>;
   endTrip(tripId: string): Promise<TripSummary>;
   roster(tripId: string): Promise<StudentLite[]>;
   setBoarding(b: Boarding): Promise<void>;

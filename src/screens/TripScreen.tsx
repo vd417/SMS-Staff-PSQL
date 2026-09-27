@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -9,11 +9,13 @@ import { Icon } from '@/components/icons';
 import { ErrorState } from '@/components/state';
 import { TextScale } from '@/theme/typography';
 import {
-  useTripAssignment, useCurrentTrip, useStartTrip, useEndTrip, useRoster, useBoarding,
+  useTripAssignment, useCurrentTrip, useStartTrip, useEndTrip, useRoster, useBoarding, useTripStops,
 } from '@/features/trip/hooks';
 import { useVehicleInspections, useFuelLogs } from '@/features/vehicleChecks/hooks';
 import { startBroadcast, stopBroadcast } from '@/features/trip/broadcaster';
-import { simulateBusPosition } from '@/features/trip/simulateBus';
+import { routeStripFor } from '@/features/trip/stopProgress';
+import { useResumeBroadcast } from '@/features/trip/useResumeBroadcast';
+import { stopActionMessage } from '@/features/trip/stopActionMessage';
 import { isAppError } from '@/lib/errors';
 import type { TripDirection, TripSummary, BoardingState } from '@/data/domain';
 
@@ -110,25 +112,25 @@ export const TripScreen = ({ navigation }: { navigation: any }) => {
   const endTrip = useEndTrip();
   const [direction, setDirection] = useState<TripDirection>('pickup');
   const [summary, setSummary] = useState<TripSummary | null>(null);
-  // Tick state so the RouteStrip advances every 5 s without a full refetch.
-  const [now, setNow] = useState(() => Date.now());
 
   const accent = role.accent;
   const trip = current.data;
-
-  // Update 'now' every 5 s while a live trip is active so progress animates.
-  useEffect(() => {
-    if (!trip) return;
-    const id = setInterval(() => setNow(Date.now()), 5_000);
-    return () => clearInterval(id);
-  }, [trip]);
+  const tripStops = useTripStops(trip?.id, !!trip);
+  useResumeBroadcast(trip);
 
   const onStart = async () => {
     if (!assignment.data) return;
-    const started = await startTrip.mutateAsync({
-      routeId: assignment.data.route.id, direction, busNo: assignment.data.busNo,
-    });
-    const ok = await startBroadcast({ tripId: started.id, onPing: (p) => repos.trip.publishPing(p) });
+    let started;
+    try {
+      started = await startTrip.mutateAsync({
+        routeId: assignment.data.route.id, direction, busNo: assignment.data.busNo,
+      });
+    } catch (e) {
+      // not_assigned / no_driver_assigned / bus_already_active — say why instead of failing silently.
+      toast.show(stopActionMessage(e, t), 'error');
+      return;
+    }
+    const ok = await startBroadcast({ tripId: started.id, onPings: (id, pings) => repos.trip.publishPings(id, pings) });
     if (!ok) {
       toast.show(t('trip.permissionDenied'), 'error');
       await endTrip.mutateAsync(started.id);
@@ -143,22 +145,6 @@ export const TripScreen = ({ navigation }: { navigation: any }) => {
     const s = await endTrip.mutateAsync(trip.id);
     setSummary(s);
   };
-
-  // Derive live bus position from simulated route progress.
-  const routeProgress = useCallback(() => {
-    if (!trip || !assignment.data) return { progress: 0, currentStopName: undefined, nextStopName: undefined };
-    const stops = assignment.data.route.stops;
-    const lastStop = stops[stops.length - 1];
-    const totalMs = (lastStop?.etaMin ?? 30) * 60 * 1000;
-    const elapsed = trip.startedAt ? now - Date.parse(trip.startedAt) : 0;
-    const progress = Math.max(0, Math.min(1, totalMs > 0 ? elapsed / totalMs : 0));
-    const sim = simulateBusPosition(assignment.data.route, elapsed, totalMs);
-    return {
-      progress,
-      currentStopName: stops[sim.segmentIndex]?.name,
-      nextStopName: stops[sim.segmentIndex + 1]?.name,
-    };
-  }, [trip, assignment.data, now]);
 
   return (
     <SafeAreaView style={[styles.fill, { backgroundColor: colors.bg }]}>
@@ -195,14 +181,14 @@ export const TripScreen = ({ navigation }: { navigation: any }) => {
               <Text style={[TextScale.bodyStrong, { color: '#FFFFFF' }]}>{t('trip.broadcasting')}</Text>
             </View>
             {assignment.data && (() => {
-              const { progress, currentStopName, nextStopName } = routeProgress();
+              const strip = routeStripFor(assignment.data.route.stops, tripStops.data);
               return (
                 <RouteStrip
                   route={assignment.data.route}
-                  progress={progress}
+                  progress={strip.progress}
                   accent={accent}
-                  currentStopName={currentStopName}
-                  nextStopName={nextStopName}
+                  currentStopName={strip.currentStopName}
+                  nextStopName={strip.nextStopName}
                 />
               );
             })()}
@@ -230,6 +216,9 @@ export const TripScreen = ({ navigation }: { navigation: any }) => {
                   <Pill label={`${t('trip.stops')} · ${assignment.data.route.stops.length}`} color={accent} bg={colors.surface2} icon="route" />
                   {assignment.data.conductorName ? (
                     <Pill label={`${t('role.conductor')} · ${assignment.data.conductorName}`} color={colors.primary} bg={colors.primaryDim} icon="visitor" />
+                  ) : null}
+                  {role.key === 'conductor' && assignment.data.driverName ? (
+                    <Pill label={`${t('role.driver')} · ${assignment.data.driverName}`} color={colors.primary} bg={colors.primaryDim} icon="visitor" />
                   ) : null}
                 </View>
                 <View style={[styles.dutyGrid, { borderTopColor: colors.line }]}>

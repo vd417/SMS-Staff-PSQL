@@ -14,10 +14,10 @@ export function httpTrip(http: HttpClient): TripRepository {
     // bus_no is required: sms-api resolves the bus (and its assigned driver/conductor) from it.
     startTrip: (routeId: string, direction: TripDirection, busNo: string) =>
       http.post('/staff/trips', { route_id: routeId, bus_no: busNo, direction }).then((d) => toTrip(parseWire(tripSchema, d, 'trip'))),
-    publishPing: (ping: TripPing) =>
+    publishPings: (tripId: string, pings: TripPing[]) =>
       http
-        .post<void>(`/staff/trips/${ping.tripId}/pings`, {
-          pings: [{ lat: ping.lat, lng: ping.lng, speed_kmh: ping.speedKmh, heading: ping.heading, at: ping.at }],
+        .post<void>(`/staff/trips/${tripId}/pings`, {
+          pings: pings.map((p) => ({ lat: p.lat, lng: p.lng, speed_kmh: p.speedKmh, heading: p.heading, at: p.at })),
         })
         .then(() => undefined),
     endTrip: (tripId: string) =>

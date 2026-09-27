@@ -31,18 +31,20 @@ describe('httpTrip.startTrip', () => {
   });
 });
 
-describe('httpTrip.publishPing', () => {
-  // Backend binds this route to BulkPingRequest(IReadOnlyList<PingItem> Pings) — a flat
-  // ping object with no "pings" wrapper fails model binding and is silently dropped.
-  it('wraps the ping in a single-item pings array matching the backend BulkPingRequest contract', async () => {
+describe('httpTrip.publishPings', () => {
+  it('posts the batch in the BulkPingRequest shape', async () => {
     const { http, calls } = fakeHttp({ 'POST /staff/trips/t1/pings': undefined });
-    await httpTrip(http).publishPing({
-      tripId: 't1', lat: 12.9, lng: 77.6, speedKmh: 32, heading: 90, at: '2026-08-29T00:00:00Z',
-    });
+    await httpTrip(http).publishPings('t1', [
+      { tripId: 't1', lat: 12.9, lng: 77.6, speedKmh: 32, heading: 90, at: '2026-08-29T00:00:00Z' },
+      { tripId: 't1', lat: 12.91, lng: 77.61, speedKmh: 30, heading: 92, at: '2026-08-29T00:00:10Z' },
+    ]);
     expect(calls[0]).toEqual({
       method: 'POST',
       path: '/staff/trips/t1/pings',
-      body: { pings: [{ lat: 12.9, lng: 77.6, speed_kmh: 32, heading: 90, at: '2026-08-29T00:00:00Z' }] },
+      body: { pings: [
+        { lat: 12.9, lng: 77.6, speed_kmh: 32, heading: 90, at: '2026-08-29T00:00:00Z' },
+        { lat: 12.91, lng: 77.61, speed_kmh: 30, heading: 92, at: '2026-08-29T00:00:10Z' },
+      ] },
     });
   });
 });
