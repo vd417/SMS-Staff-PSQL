@@ -1,16 +1,10 @@
 import type { HttpClient } from '@/lib/httpClient';
 import type { RouteGeometry } from '@/data/domain';
+import { parseWire } from './schemas/wire';
+import { routeGeometrySchema } from './schemas/features.schema';
+import type { z } from 'zod';
 
-interface RouteGeometryWireDTO {
-  route_id: string;
-  status: 'available' | 'unavailable';
-  format: string | null;
-  geometry: string | null;
-  distance_meters: number | null;
-  duration_seconds: number | null;
-  stop_sequence_hash: string;
-  generated_at: string | null;
-}
+type RouteGeometryWireDTO = z.output<typeof routeGeometrySchema>;
 
 const toRouteGeometry = (d: RouteGeometryWireDTO): RouteGeometry => ({
   routeId: d.route_id,
@@ -26,6 +20,6 @@ const toRouteGeometry = (d: RouteGeometryWireDTO): RouteGeometry => ({
 export function httpRouteGeometry(http: HttpClient) {
   return {
     get: (routeId: string): Promise<RouteGeometry> =>
-      http.get<RouteGeometryWireDTO>(`/transport/routes/${routeId}/geometry`).then(toRouteGeometry),
+      http.get(`/transport/routes/${routeId}/geometry`).then((d) => toRouteGeometry(parseWire(routeGeometrySchema, d, 'route geometry'))),
   };
 }
