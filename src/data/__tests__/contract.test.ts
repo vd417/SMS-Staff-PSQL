@@ -35,7 +35,7 @@ function fixtureHttp(): HttpClient {
         id: 'route_7', name: 'Route 7', bus_no: 'HR-26-BX-4412',
         stops: [{ id: 'stop_1', name: 'School Gate', lat: 28.4595, lng: 77.0266, seq: 0 }],
       },
-      bus_no: 'HR-26-BX-4412', conductor_name: 'Sita Devi',
+      bus_id: 'bus_7', bus_no: 'HR-26-BX-4412', driver_name: 'Ramesh Kumar', conductor_name: 'Sita Devi', students_assigned: 0,
     },
     'GET /staff/tasks': [{ id: 'task_1', title: 'X', priority: 'normal', done: false, due_label: 'x' }],
     'GET /leave/balances': [{ type: 'casual', total: 12, used: 4 }],

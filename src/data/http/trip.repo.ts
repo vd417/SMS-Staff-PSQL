@@ -1,39 +1,37 @@
 import type { TripRepository } from '@/data/repositories/types';
 import type { TripPing, Boarding, TripDirection } from '@/data/domain';
 import type { HttpClient } from '@/lib/httpClient';
-import {
-  toTripAssignment, toTrip, toTripSummary, toStudentLite, toBoarding,
-  type TripAssignmentDTO, type TripDTO, type TripSummaryDTO, type StudentLiteDTO, type BoardingDTO,
-} from './mappers';
+import { toTripAssignment, toTrip, toTripSummary, toStudentLite, toBoarding } from './mappers';
+import { parseWire } from './schemas/wire';
+import { tripAssignmentSchema, tripSchema, tripSummarySchema, rosterSchema, boardingListSchema } from './schemas/trip.schema';
 
 export function httpTrip(http: HttpClient): TripRepository {
   return {
-    myAssignment: () => http.get<TripAssignmentDTO>('/staff/trip/assignment').then(toTripAssignment),
+    myAssignment: () =>
+      http.get('/staff/trip/assignment').then((d) => toTripAssignment(parseWire(tripAssignmentSchema, d, 'trip assignment'))),
     current: () =>
-      http.get<TripDTO | null>('/staff/trip/current').then((d) => (d ? toTrip(d) : null)),
-    // bus_no is required: Trip_Start resolves BusId by (TenantId, BusNo) and live tracking
-    // joins on BusId, not the trip's route — omitting it leaves the trip unbound to any bus.
+      http.get('/staff/trip/current').then((d) => (d ? toTrip(parseWire(tripSchema, d, 'current trip')) : null)),
+    // bus_no is required: sms-api resolves the bus (and its assigned driver/conductor) from it.
     startTrip: (routeId: string, direction: TripDirection, busNo: string) =>
-      http.post<TripDTO>('/staff/trips', { route_id: routeId, bus_no: busNo, direction }).then(toTrip),
+      http.post('/staff/trips', { route_id: routeId, bus_no: busNo, direction }).then((d) => toTrip(parseWire(tripSchema, d, 'trip'))),
     publishPing: (ping: TripPing) =>
       http
         .post<void>(`/staff/trips/${ping.tripId}/pings`, {
-          pings: [
-            { lat: ping.lat, lng: ping.lng, speed_kmh: ping.speedKmh, heading: ping.heading, at: ping.at },
-          ],
+          pings: [{ lat: ping.lat, lng: ping.lng, speed_kmh: ping.speedKmh, heading: ping.heading, at: ping.at }],
         })
         .then(() => undefined),
     endTrip: (tripId: string) =>
-      http.post<TripSummaryDTO>(`/staff/trips/${tripId}/end`, {}).then(toTripSummary),
+      http.post(`/staff/trips/${tripId}/end`, {}).then((d) => toTripSummary(parseWire(tripSummarySchema, d, 'trip summary'))),
     roster: (tripId: string) =>
-      http.get<StudentLiteDTO[]>(`/staff/trips/${tripId}/roster`).then((arr) => arr.map(toStudentLite)),
+      http.get(`/staff/trips/${tripId}/roster`).then((d) => parseWire(rosterSchema, d, 'roster').map(toStudentLite)),
     setBoarding: (b: Boarding) =>
       http
         .post<void>(`/staff/trips/${b.tripId}/boarding`, {
-          student_id: b.studentId, stop_id: b.stopId, state: b.state, at: b.at,
+          // StopId is Guid? server-side: '' would fail model binding.
+          student_id: b.studentId, stop_id: b.stopId || null, state: b.state, at: b.at,
         })
         .then(() => undefined),
     boardingState: (tripId: string) =>
-      http.get<BoardingDTO[]>(`/staff/trips/${tripId}/boarding`).then((arr) => arr.map(toBoarding)),
+      http.get(`/staff/trips/${tripId}/boarding`).then((d) => parseWire(boardingListSchema, d, 'boarding').map(toBoarding)),
   };
 }

@@ -1,5 +1,5 @@
 export type TripDirection = 'pickup' | 'drop';
-export type TripStatus = 'idle' | 'live' | 'ended';
+export type TripStatus = 'idle' | 'live' | 'arrived' | 'ended';
 export type BoardingState = 'boarded' | 'dropped' | 'absent';
 
 export interface Stop {
@@ -28,7 +28,10 @@ export interface Trip {
   status: TripStatus;
   startedAt?: string;
   endedAt?: string;
-  broadcasterId?: string;
+  /** Whose phone is currently feeding GPS (a ping < 30 s old), per sms-api. */
+  activeBroadcaster?: 'driver' | 'conductor';
+  /** Stop confirmed as arrived and not yet departed (server-authoritative). */
+  currentStopId?: string;
 }
 
 export interface TripPing {
@@ -67,6 +70,7 @@ export interface TripAssignment {
   route: Route;
   busId: string;
   busNo: string;
+  driverName?: string | null;
   conductorName?: string | null;
   shift?: string;
   studentsAssigned: number;

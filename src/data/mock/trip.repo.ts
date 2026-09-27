@@ -16,6 +16,7 @@ export function mockTrip(store: Store): TripRepository {
         route: store.route,
         busId: store.busId,
         busNo: store.route.assignedBusNo,
+        driverName: store.session.user.name,
         conductorName: store.conductorName,
         shift: driverCard.kind === 'driver' ? driverCard.shift : undefined,
         studentsAssigned: driverCard.kind === 'driver' ? driverCard.studentsAssigned : 0,
@@ -41,7 +42,7 @@ export function mockTrip(store: Store): TripRepository {
         direction,
         status: 'live',
         startedAt: new Date().toISOString(),
-        broadcasterId: store.session.user.id,
+        activeBroadcaster: 'driver',
       };
       store.currentTrip = trip;
       store.boarding = [];

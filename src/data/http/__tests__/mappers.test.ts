@@ -62,7 +62,7 @@ describe('http mappers', () => {
     });
     expect(a).toEqual({
       route: { id: 'r1', name: 'North Route', assignedBusNo: 'KA-01-F-3301', stops: [] },
-      busId: 'bus_1', busNo: 'KA-01-F-3301', conductorName: null,
+      busId: 'bus_1', busNo: 'KA-01-F-3301', driverName: null, conductorName: null,
       shift: '7:00 AM - 4:00 PM', studentsAssigned: 24,
     });
   });
