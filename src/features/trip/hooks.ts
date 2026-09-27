@@ -2,7 +2,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRepositories } from '@/data/repositories/RepositoryContext';
 import { useTenantId } from '@/features/auth/AuthProvider';
 import { queryKeys } from '@/lib/queryClient';
-import type { TripDirection, Boarding } from '@/data/domain';
+import type { TripDirection, Boarding, TripStops } from '@/data/domain';
+import { AppError } from '@/lib/errors';
+import { isAlreadyApplied, type StopAction } from './stopProgress';
 
 export function useTripAssignment() {
   const repos = useRepositories();
@@ -74,4 +76,40 @@ export function useBoarding(tripId: string | undefined) {
     onSettled: (_d, _e, b) => qc.invalidateQueries({ queryKey: queryKeys.tripBoarding(b.tripId) }),
   });
   return { ...query, setBoarding };
+}
+
+export function useTripStops(tripId: string | undefined, active: boolean) {
+  const repos = useRepositories();
+  return useQuery({
+    queryKey: queryKeys.tripStops(tripId ?? 'none'),
+    queryFn: () => repos.trip.stops(tripId as string),
+    enabled: !!tripId,
+    // The other phone (driver/conductor) can advance stops too — keep in step while live.
+    refetchInterval: active ? 15_000 : false,
+  });
+}
+
+export function useStopActions(tripId: string | undefined) {
+  const repos = useRepositories();
+  const qc = useQueryClient();
+  const tenantId = useTenantId();
+  return useMutation({
+    mutationFn: async (action: StopAction): Promise<void> => {
+      if (!tripId) throw new AppError('no_trip', 0, 'No active trip');
+      try {
+        if (action.kind === 'arrive') await repos.trip.confirmArrival(tripId, action.stopId);
+        else if (action.kind === 'depart') await repos.trip.departStop(tripId, action.stopId);
+        else await repos.trip.markSchoolArrived(tripId);
+      } catch (err) {
+        const fresh: TripStops | null = action.kind === 'arrive' ? null : await repos.trip.stops(tripId).catch(() => null);
+        if (isAlreadyApplied(err, action, fresh)) return;
+        throw err;
+      }
+    },
+    onSettled: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.tripStops(tripId ?? 'none') }),
+        qc.invalidateQueries({ queryKey: queryKeys.tripCurrent(tenantId) }),
+      ]),
+  });
 }

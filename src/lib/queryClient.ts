@@ -21,6 +21,7 @@ export const queryKeys = {
   tripAssignment: (tenantId: string) => ['trip', 'assignment', tenantId] as const,
   tripCurrent: (tenantId: string) => ['trip', 'current', tenantId] as const,
   tripRoster: (tripId: string) => ['trip', 'roster', tripId] as const,
+  tripStops: (tripId: string) => ['trip', 'stops', tripId] as const,
   routeGeometry: (routeId: string) => ['transport', 'routeGeometry', routeId] as const,
   tripBoarding: (tripId: string) => ['trip', 'boarding', tripId] as const,
   tasks: (tenantId: string) => ['tasks', tenantId] as const,
