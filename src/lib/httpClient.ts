@@ -57,9 +57,17 @@ export function createHttpClient(opts: HttpClientOptions): HttpClient {
       throw new AppError('network', 0, 'Network request failed');
     }
 
-    if (res.status === 401 && !replayed && opts.onUnauthorized && !isAuthExchangePath(path)) {
-      const fresh = await opts.onUnauthorized();
-      if (fresh) return request<T>(method, path, body, true);
+    if (res.status === 401 && !replayed && !isAuthExchangePath(path)) {
+      const latest = opts.getAuth().accessToken;
+      if (latest && latest !== accessToken) {
+        // Another caller already refreshed while this request was in flight — replay
+        // immediately with the new token instead of triggering a second rotation.
+        return request<T>(method, path, body, true);
+      }
+      if (opts.onUnauthorized) {
+        const fresh = await opts.onUnauthorized();
+        if (fresh) return request<T>(method, path, body, true);
+      }
     }
 
     let payload: unknown = null;

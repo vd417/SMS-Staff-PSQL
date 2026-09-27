@@ -39,9 +39,21 @@ describe('createSessionRefresher', () => {
     expect(d.onExpired).toHaveBeenCalledTimes(1);
   });
 
-  it('does not expire the session on a network failure', async () => {
+  it('does not expire the session on a network failure, but rejects so the caller can retry', async () => {
     const d = deps({ refresh: jest.fn().mockRejectedValue(new AppError('network', 0, 'offline')) });
-    await expect(createSessionRefresher(d).refresh()).resolves.toBeNull();
+    await expect(createSessionRefresher(d).refresh()).rejects.toMatchObject({ code: 'network' });
+    expect(d.onExpired).not.toHaveBeenCalled();
+  });
+
+  it('does not expire the session on a 503, but rejects so the caller can retry', async () => {
+    const d = deps({ refresh: jest.fn().mockRejectedValue(new AppError('http_error', 503, 'down')) });
+    await expect(createSessionRefresher(d).refresh()).rejects.toMatchObject({ code: 'network' });
+    expect(d.onExpired).not.toHaveBeenCalled();
+  });
+
+  it('does not expire the session on a 429, but rejects so the caller can retry', async () => {
+    const d = deps({ refresh: jest.fn().mockRejectedValue(new AppError('too_many_requests', 429, 'slow down')) });
+    await expect(createSessionRefresher(d).refresh()).rejects.toMatchObject({ code: 'network' });
     expect(d.onExpired).not.toHaveBeenCalled();
   });
 
