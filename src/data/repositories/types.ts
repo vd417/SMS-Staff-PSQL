@@ -8,6 +8,7 @@ import type {
   VehicleInspection, NewVehicleInspection, FuelLogEntry, NewFuelLogEntry,
 } from '@/data/domain';
 import type { Role } from '@/theme/roles';
+import type { Tokens } from '@/lib/tokenStore';
 
 export interface OtpChallenge {
   channel: 'sms' | 'email';
@@ -19,7 +20,7 @@ export interface AuthRepository {
   verifyOtp(identifier: string, code: string, roleKey: Role): Promise<Session>;
   login(identifier: string, password: string, roleKey: Role): Promise<Session>;
   setPassword(password: string): Promise<void>;
-  refresh(refreshToken: string): Promise<Session>;
+  refresh(refreshToken: string): Promise<Tokens>;
   me(previous?: Staff): Promise<Staff>;
   logout(refreshToken: string | null): Promise<void>;
 }

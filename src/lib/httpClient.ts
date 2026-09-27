@@ -9,6 +9,8 @@ export interface HttpClientOptions {
   baseUrl: string;
   getAuth: () => AuthSnapshot;
   fetchImpl?: typeof fetch;
+  /** Called once on a 401 from a non-auth route; resolves to a new access token or null. */
+  onUnauthorized?: () => Promise<string | null>;
 }
 
 export interface HttpClient {
@@ -26,10 +28,16 @@ function buildQuery(params?: Record<string, unknown>): string {
   return pairs.length ? `?${pairs.join('&')}` : '';
 }
 
+// Credential-exchange routes answer 401 for bad credentials, never for an expired access token.
+// /auth/me is the exception: it is a normal [Authorize] read (used at bootstrap).
+function isAuthExchangePath(path: string): boolean {
+  return path.startsWith('/auth/') && !path.startsWith('/auth/me');
+}
+
 export function createHttpClient(opts: HttpClientOptions): HttpClient {
   const fetchImpl = opts.fetchImpl ?? fetch;
 
-  async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  async function request<T>(method: string, path: string, body?: unknown, replayed = false): Promise<T> {
     const { accessToken, tenantId } = opts.getAuth();
     const headers: Record<string, string> = {};
     if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -47,6 +55,11 @@ export function createHttpClient(opts: HttpClientOptions): HttpClient {
       // No response at all (offline, DNS, server down) — typed so screens can say
       // "cannot reach server" instead of surfacing a raw TypeError.
       throw new AppError('network', 0, 'Network request failed');
+    }
+
+    if (res.status === 401 && !replayed && opts.onUnauthorized && !isAuthExchangePath(path)) {
+      const fresh = await opts.onUnauthorized();
+      if (fresh) return request<T>(method, path, body, true);
     }
 
     let payload: unknown = null;

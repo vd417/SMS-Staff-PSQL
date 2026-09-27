@@ -45,7 +45,7 @@ export function mockAuth(store: Store): AuthRepository {
     },
     async refresh() {
       await simulateLatency();
-      return cloneSession(store.session);
+      return { accessToken: 'mock-access-token', refreshToken: 'mock-refresh-token' };
     },
     async me() {
       await simulateLatency();

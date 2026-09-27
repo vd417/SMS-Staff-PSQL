@@ -2,7 +2,6 @@ import type { AuthRepository } from '@/data/repositories/types';
 import type { Session } from '@/data/domain';
 import type { HttpClient } from '@/lib/httpClient';
 import { authSnapshot } from '@/lib/authSnapshot';
-import { toSession, type SessionDTO } from './mappers';
 import {
   tokenSchema, meSchema, toStaffFromMe, toTenantFromMe, maskIdentifier, buildLoginRequest,
 } from './auth.schema';
@@ -44,8 +43,11 @@ export function httpAuth(http: HttpClient): AuthRepository {
     setPassword: async (password) => {
       await http.post('/auth/set-password', { password });
     },
-    refresh: (refreshToken) =>
-      http.post<SessionDTO>('/auth/refresh', { refresh_token: refreshToken }).then(toSession),
+    // sms-api returns only the rotated pair (TokenResponse) — no user/tenant.
+    refresh: async (refreshToken) => {
+      const t = tokenSchema.parse(await http.post('/auth/refresh', { refresh_token: refreshToken }));
+      return { accessToken: t.access_token, refreshToken: t.refresh_token };
+    },
     me: async (previous) => {
       const me = meSchema.parse(await http.get('/auth/me'));
       return toStaffFromMe(me, previous?.roleKey ?? 'driver', previous);

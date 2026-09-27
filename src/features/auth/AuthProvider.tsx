@@ -6,6 +6,8 @@ import { tokenStore } from '@/lib/tokenStore';
 import { asyncStore } from '@/lib/asyncStore';
 import { authSnapshot } from '@/lib/authSnapshot';
 import { queryClient } from '@/lib/queryClient';
+import { sessionEvents } from '@/lib/sessionEvents';
+import { isAppError } from '@/lib/errors';
 import { useRepositories } from '@/data/repositories/RepositoryContext';
 import { useTheme } from '@/theme';
 
@@ -67,12 +69,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // stored user through — me() preserves roleKey/dutyPost/rating/shift/
           // timing from it and only refreshes the fields the backend does return.
           const user = await repos.auth.me(stored.user);
-          const rehydrated: Session = { ...stored, ...tokens, user };
+          // /auth/me may have triggered a silent refresh that rotated the pair — re-read it.
+          const latest = (await tokenStore.read()) ?? tokens;
+          const rehydrated: Session = { ...stored, ...latest, user };
           authSnapshot.set({ accessToken: rehydrated.accessToken, tenantId: rehydrated.tenant.id });
           applyRoleFromSession(rehydrated);
           setSession(rehydrated);
           setStatus('authenticated');
-        } catch {
+        } catch (err) {
+          if (isAppError(err) && err.code === 'network') {
+            // Offline cold start (driver in a dead zone): keep the stored session; requests
+            // retry once connectivity returns. Only an auth rejection logs out.
+            const offline: Session = { ...stored, ...tokens };
+            authSnapshot.set({ accessToken: offline.accessToken, tenantId: offline.tenant.id });
+            applyRoleFromSession(offline);
+            setSession(offline);
+            setStatus('authenticated');
+            return;
+          }
           await tokenStore.clear();
           await asyncStore.remove(SESSION_KEY);
           setStatus('unauthenticated');
@@ -84,6 +98,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     })();
   }, [repos, applyRoleFromSession]);
+
+  // The refresh token was rejected (revoked / expired after 30 days): drop to Login.
+  useEffect(() => sessionEvents.onExpired(() => {
+    void tokenStore.clear();
+    void asyncStore.remove(SESSION_KEY);
+    authSnapshot.clear();
+    queryClient.clear();
+    setSession(null);
+    setPendingPasswordSetup(null);
+    setStatus('unauthenticated');
+  }), []);
 
   const establishSession = useCallback(async (s: Session) => {
     await tokenStore.save({ accessToken: s.accessToken, refreshToken: s.refreshToken });
@@ -144,7 +169,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = useCallback(async () => {
     try {
-      await repos.auth.logout(session?.refreshToken ?? null);
+      // The stored pair is authoritative — it may have been rotated since sign-in.
+      const current = (await tokenStore.read())?.refreshToken ?? session?.refreshToken ?? null;
+      await repos.auth.logout(current);
     } finally {
       await tokenStore.clear();
       await asyncStore.remove(SESSION_KEY);
