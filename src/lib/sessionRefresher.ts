@@ -38,6 +38,12 @@ export function createSessionRefresher(deps: SessionRefresherDeps): SessionRefre
     }
     try {
       const tokens = await deps.refresh(refreshToken);
+      // A sign-out (or expiry) may have cleared the stored session while this network call was in
+      // flight. sms-api rotates the refresh token on success, so writing the rotated pair back now
+      // would silently resurrect the session the user just ended. A normal refresh still has the
+      // old refresh token in storage at this point, so a now-empty store means a deliberate
+      // teardown — discard the result instead of saving it.
+      if ((await deps.readRefreshToken()) === null) return null;
       await deps.saveTokens(tokens);
       deps.onRefreshed(tokens.accessToken);
       return tokens.accessToken;

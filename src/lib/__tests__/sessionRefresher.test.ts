@@ -57,6 +57,19 @@ describe('createSessionRefresher', () => {
     expect(d.onExpired).not.toHaveBeenCalled();
   });
 
+  it('does not write tokens back when the session is cleared mid-refresh (sign-out)', async () => {
+    // rt present when the refresh starts, then gone because the user signed out (tokenStore.clear)
+    // while the network call was in flight. The rotated tokens must be discarded, not saved back —
+    // otherwise sign-out silently resurrects the session.
+    const readRefreshToken = jest.fn()
+      .mockResolvedValueOnce('rt-1')
+      .mockResolvedValueOnce(null);
+    const d = deps({ readRefreshToken });
+    await expect(createSessionRefresher(d).refresh()).resolves.toBeNull();
+    expect(d.saveTokens).not.toHaveBeenCalled();
+    expect(d.onRefreshed).not.toHaveBeenCalled();
+  });
+
   it('expires when there is no refresh token stored', async () => {
     const d = deps({ readRefreshToken: jest.fn().mockResolvedValue(null) });
     await expect(createSessionRefresher(d).refresh()).resolves.toBeNull();
