@@ -59,6 +59,8 @@ export interface TasksRepository {
 
 export interface IssuesRepository {
   list(): Promise<Issue[]>;
+  /// Single-issue detail, including the attached photo the list intentionally omits.
+  get(id: string): Promise<Issue>;
   create(req: NewIssue): Promise<Issue>;
 }
 

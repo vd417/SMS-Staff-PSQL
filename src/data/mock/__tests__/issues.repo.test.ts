@@ -33,6 +33,17 @@ describe('mock issues repo', () => {
     expect(created.id).toBeTruthy();
   });
 
+  it('get returns the created issue including its attached photo', async () => {
+    const repo = mockIssues(await createStore());
+    const created = await repo.create({
+      category: 'other', title: 'With photo', description: 'd', priority: 'normal',
+      photoUri: 'data:image/jpeg;base64,xyz',
+    });
+    const fetched = await repo.get(created.id);
+    expect(fetched.id).toBe(created.id);
+    expect(fetched.photoUrl).toBe('data:image/jpeg;base64,xyz');
+  });
+
   it('create prepends the new issue so list() returns newest first', async () => {
     const repo = mockIssues(await createStore());
     await repo.create({ category: 'other', title: 'First', description: 'd', priority: 'normal' });

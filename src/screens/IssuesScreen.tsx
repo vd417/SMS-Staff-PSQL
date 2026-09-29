@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, Pressable, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TextInput, Pressable, Image, StyleSheet } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import * as ImagePicker from 'expo-image-picker';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { useTheme } from '@/theme';
-import { useIssues, useReportIssue } from '@/features/issues/hooks';
+import { useIssues, useReportIssue, useIssueDetail } from '@/features/issues/hooks';
 import { useCurrentTrip } from '@/features/trip/hooks';
 import { Card, Btn, Pill, Skeleton, IconBtn, useToast } from '@/components/ui';
 import { ErrorState } from '@/components/state';
@@ -44,6 +44,9 @@ export const IssuesScreen: React.FC<IssuesScreenProps> = ({ navigation }) => {
   const [photoUri, setPhotoUri] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  // The list omits photos for bandwidth; a report's photo is fetched on demand when it's opened.
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const detail = useIssueDetail(expandedId ?? undefined);
 
   const attachPhoto = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -157,10 +160,24 @@ export const IssuesScreen: React.FC<IssuesScreenProps> = ({ navigation }) => {
           : isError ? <ErrorState onRetry={refetch} />
           : data && data.length > 0 ? data.map((issue) => (
             <Card key={issue.id}>
-              <View style={styles.issueRow}>
+              <Pressable
+                testID={`issue-row-${issue.id}`}
+                accessibilityRole="button"
+                onPress={() => setExpandedId((cur) => (cur === issue.id ? null : issue.id))}
+                style={styles.issueRow}
+              >
                 <Text style={[TextScale.body, { color: colors.ink, flex: 1 }]}>{issue.title}</Text>
                 <Pill label={t(`issues.status.${issue.status}`)} color={statusColor(issue.status, colors)} bg={colors.surface2} />
-              </View>
+              </Pressable>
+              {expandedId === issue.id ? (
+                <View style={styles.detail}>
+                  {detail.isLoading ? <View testID="issue-photo-loading"><Skeleton width="100%" height={180} radius={12} /></View>
+                    : detail.isError ? <ErrorState onRetry={detail.refetch} />
+                    : detail.data?.photoUrl
+                      ? <Image testID="issue-photo" source={{ uri: detail.data.photoUrl }} style={styles.photo} resizeMode="cover" />
+                      : <Text testID="issue-no-photo" style={[TextScale.caption, { color: colors.inkSoft }]}>{t('issues.noPhoto')}</Text>}
+                </View>
+              ) : null}
             </Card>
           )) : <Text style={[TextScale.caption, { color: colors.inkSoft }]}>{t('issues.empty')}</Text>}
       </ScrollView>
@@ -180,4 +197,6 @@ const styles = StyleSheet.create({
   spacer: { marginTop: 4, marginBottom: 8 },
   cta: { marginTop: 4 },
   issueRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  detail: { marginTop: 10 },
+  photo: { width: '100%', height: 180, borderRadius: 12 },
 });

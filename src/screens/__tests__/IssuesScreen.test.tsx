@@ -32,9 +32,12 @@ jest.mock('@/features/trip/hooks', () => ({
 }));
 
 const mockCreate = jest.fn(async (req: unknown) => ({ id: 'i1', status: 'open', createdAt: '2026-09-15T08:00:00Z', ...(req as object) }));
+let mockIssuesData: any[] = [];
+let mockDetail: any = { data: undefined, isLoading: false, isError: false, refetch: jest.fn() };
 jest.mock('@/features/issues/hooks', () => ({
-  useIssues: () => ({ data: [], isLoading: false, isError: false, refetch: jest.fn() }),
+  useIssues: () => ({ data: mockIssuesData, isLoading: false, isError: false, refetch: jest.fn() }),
   useReportIssue: () => ({ mutateAsync: mockCreate, isPending: false }),
+  useIssueDetail: () => mockDetail,
 }));
 
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() } as any;
@@ -44,6 +47,8 @@ function renderIssues() {
 }
 
 beforeEach(() => {
+  mockIssuesData = [];
+  mockDetail = { data: undefined, isLoading: false, isError: false, refetch: jest.fn() };
   mockCreate.mockClear();
   mockRequestMediaLibraryPermissionsAsync.mockClear();
   mockLaunchImageLibraryAsync.mockClear();
@@ -116,6 +121,42 @@ it('shows a toast and does not attach the photo when it is still too large after
 it('shows an empty state when there are no past reports', async () => {
   const { getByText } = renderIssues();
   await waitFor(() => expect(getByText('No reports yet')).toBeTruthy());
+});
+
+const issueRow = (over: Record<string, unknown> = {}) => ({
+  id: 'i1', category: 'safety', title: 'Loose seatbelt', description: 'd', priority: 'high',
+  status: 'open', createdAt: '2026-09-15T08:00:00Z', ...over,
+});
+
+it('opens a report on tap and shows its attached photo', async () => {
+  mockIssuesData = [issueRow()];
+  mockDetail = { data: issueRow({ photoUrl: 'data:image/jpeg;base64,abc' }), isLoading: false, isError: false, refetch: jest.fn() };
+  const { getByTestId, findByTestId } = renderIssues();
+  await findByTestId('issue-row-i1');
+  fireEvent.press(getByTestId('issue-row-i1'));
+  const photo = await findByTestId('issue-photo');
+  expect(photo.props.source).toEqual({ uri: 'data:image/jpeg;base64,abc' });
+});
+
+it('shows a no-photo message when an opened report has no photo', async () => {
+  mockIssuesData = [issueRow()];
+  mockDetail = { data: issueRow(), isLoading: false, isError: false, refetch: jest.fn() };
+  const { getByTestId, findByTestId, getByText } = renderIssues();
+  await findByTestId('issue-row-i1');
+  fireEvent.press(getByTestId('issue-row-i1'));
+  await waitFor(() => expect(getByText('No photo attached')).toBeTruthy());
+});
+
+it('shows an error with retry when the report detail fails to load', async () => {
+  const refetch = jest.fn();
+  mockIssuesData = [issueRow()];
+  mockDetail = { data: undefined, isLoading: false, isError: true, refetch };
+  const { getByTestId, findByTestId, getByText } = renderIssues();
+  await findByTestId('issue-row-i1');
+  fireEvent.press(getByTestId('issue-row-i1'));
+  await waitFor(() => expect(getByText('Something went wrong')).toBeTruthy());
+  fireEvent.press(getByText('Retry'));
+  expect(refetch).toHaveBeenCalled();
 });
 
 it('navigates back when the back button is pressed', async () => {

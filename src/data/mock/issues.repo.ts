@@ -11,6 +11,12 @@ export function mockIssues(store: Store): IssuesRepository {
       await simulateLatency();
       return clone(store.issues);
     },
+    async get(id: string): Promise<Issue> {
+      await simulateLatency();
+      const found = store.issues.find((i) => i.id === id);
+      if (!found) throw new Error('issue_not_found');
+      return clone(found);
+    },
     async create(req: NewIssue): Promise<Issue> {
       await simulateLatency();
       const issue: Issue = {

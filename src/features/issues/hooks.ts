@@ -10,6 +10,17 @@ export function useIssues() {
   return useQuery({ queryKey: queryKeys.issues(tenantId), queryFn: () => repos.issues.list() });
 }
 
+// Single-issue detail, fetched only when a report is opened — this is where the attached photo
+// (deliberately omitted from the list for bandwidth) is loaded. Disabled until an id is provided.
+export function useIssueDetail(id: string | undefined) {
+  const repos = useRepositories();
+  return useQuery({
+    queryKey: queryKeys.issueDetail(id ?? '__none__'),
+    queryFn: () => repos.issues.get(id as string),
+    enabled: !!id,
+  });
+}
+
 export function useReportIssue() {
   const repos = useRepositories();
   const qc = useQueryClient();

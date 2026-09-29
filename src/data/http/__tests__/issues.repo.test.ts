@@ -25,6 +25,19 @@ describe('httpIssues', () => {
     ]);
   });
 
+  it('get fetches a single issue by id and maps its photo_url', async () => {
+    const { http, calls } = fakeHttp({
+      'GET /staff/issues/i1': {
+        id: 'i1', category: 'safety', title: 'Loose seatbelt', description: 'd', priority: 'high',
+        status: 'open', photo_url: 'data:image/jpeg;base64,abc', created_at: '2026-09-15T08:00:00Z',
+      },
+    });
+    const issue = await httpIssues(http).get('i1');
+    expect(calls[0]).toEqual({ method: 'GET', path: '/staff/issues/i1' });
+    expect(issue.id).toBe('i1');
+    expect(issue.photoUrl).toBe('data:image/jpeg;base64,abc');
+  });
+
   it('create posts snake_case fields and maps the response back', async () => {
     const { http, calls } = fakeHttp({
       'POST /staff/issues': { id: 'i2', category: 'other', title: 'T', description: 'd', priority: 'normal', status: 'open', created_at: '2026-09-15T08:00:00Z' },
