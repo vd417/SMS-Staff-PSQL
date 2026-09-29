@@ -116,7 +116,7 @@ export const TripScreen = ({ navigation }: { navigation: any }) => {
   const accent = role.accent;
   const trip = current.data;
   const tripStops = useTripStops(trip?.id, !!trip);
-  useResumeBroadcast(trip);
+  useResumeBroadcast(trip, () => toast.show(t('trip.resumeFailed'), 'error'));
 
   const onStart = async () => {
     if (!assignment.data) return;

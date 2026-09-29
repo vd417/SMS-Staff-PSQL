@@ -38,7 +38,7 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
   const toast = useToast();
   const assignment = useTripAssignment();
   const current = useCurrentTrip();
-  useResumeBroadcast(current.data);
+  useResumeBroadcast(current.data, () => toast.show(t('trip.resumeFailed'), 'error'));
   const tripId = route.params.tripId;
   const roster = useRoster(tripId);
   const boarding = useBoarding(tripId);
