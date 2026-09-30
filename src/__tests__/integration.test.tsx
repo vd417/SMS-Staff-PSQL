@@ -91,7 +91,7 @@ it('logs in with identifier + password and lands on Home with school identity', 
   expect(await findByText('Greenfield Public School', {}, { timeout: 5000 })).toBeTruthy();
 }, 20000);
 
-it('first-time staff: OTP verify -> set password -> lands on the authenticated app', async () => {
+it('first-time staff: enter OTP + new password on one screen -> lands on the authenticated app', async () => {
   const { getByTestId, findByText } = renderApp();
   await pastSplash(getByTestId);
 
@@ -101,18 +101,14 @@ it('first-time staff: OTP verify -> set password -> lands on the authenticated a
   // Phone field defaults to '98765 43210' (valid), so send-otp-cta is enabled.
   await waitFor(() => getByTestId('send-otp-cta'), { timeout: 3000 });
   fireEvent.press(getByTestId('send-otp-cta'));
-  await waitFor(() => getByTestId('otp-input'), { timeout: 5000 });
 
+  // OTP entry and password creation now share one screen.
+  await waitFor(() => getByTestId('otp-input'), { timeout: 5000 });
   // Mock verifyOtp accepts any 6-digit code.
   fireEvent.changeText(getByTestId('otp-input'), '123456');
-  fireEvent.press(getByTestId('verify-cta'));
-
-  // Verify succeeds but must NOT authenticate directly — Set Password shows first.
-  await waitFor(() => getByTestId('set-password-new-input'), { timeout: 5000 });
-
   fireEvent.changeText(getByTestId('set-password-new-input'), 'hunter2222');
   fireEvent.changeText(getByTestId('set-password-confirm-input'), 'hunter2222');
-  fireEvent.press(getByTestId('set-password-cta'));
+  fireEvent.press(getByTestId('activate-cta'));
 
   expect(await findByText('Greenfield Public School', {}, { timeout: 5000 })).toBeTruthy();
 }, 20000);

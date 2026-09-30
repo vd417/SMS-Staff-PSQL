@@ -22,6 +22,8 @@
   "login.invalidPassword": "Enter your password",
   "login.firstTimeOrForgot": "First time here? Forgot password?",
   "login.otpSetupSubtitle": "We'll send you a one-time code to set your password",
+  "login.otpActivateSubtitle": "Enter the code we sent, then create your password",
+  "login.verifyAndCreate": "Verify & create password",
   "login.backToPasswordLogin": "Back to password login",
   "setPassword.title": "Set your password",
   "setPassword.subtitle": "Choose a password for future logins",

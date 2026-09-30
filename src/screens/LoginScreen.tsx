@@ -7,8 +7,7 @@ import { z } from 'zod';
 import { useTheme } from '@/theme';
 import { TextScale } from '@/theme/typography';
 import { SUPPORTED_LANGUAGES, setLanguage, i18n, type LanguageCode } from '@/i18n';
-import { useRequestOtp, useVerifyOtp, useLogin, useSetPassword } from '@/features/auth/hooks';
-import { useAuth } from '@/features/auth/AuthProvider';
+import { useRequestOtp, useActivateWithOtp, useLogin } from '@/features/auth/hooks';
 import { authErrorMessage } from '@/features/auth/authErrors';
 import { isAppError } from '@/lib/errors';
 import {
@@ -21,7 +20,7 @@ import {
 import { Icon } from '@/components/icons';
 
 type Channel = 'mobile' | 'email';
-type Mode = 'password' | 'otp-request' | 'otp-verify';
+type Mode = 'password' | 'otp-request' | 'otp-activate';
 const MIN_PASSWORD_LEN = 8;
 
 const phoneSchema = z.string().regex(/^[6-9]\d{9}$/);
@@ -42,11 +41,9 @@ function isValidEmail(raw: string): boolean {
 export const LoginScreen = () => {
   const { t } = useTranslation();
   const { colors, roleKey } = useTheme();
-  const { pendingPasswordSetup, cancelPasswordSetup } = useAuth();
   const login = useLogin();
   const requestOtp = useRequestOtp();
-  const verifyOtp = useVerifyOtp();
-  const setPassword = useSetPassword();
+  const activate = useActivateWithOtp();
 
   const [channel, setChannel] = useState<Channel>('mobile');
   const [mode, setMode] = useState<Mode>('password');
@@ -68,8 +65,7 @@ export const LoginScreen = () => {
 
   const loginErr = login.error ? authErrorMessage(login.error) : null;
   const requestErr = requestOtp.error ? authErrorMessage(requestOtp.error) : null;
-  const verifyErr = verifyOtp.error ? authErrorMessage(verifyOtp.error) : null;
-  const setPasswordErr = setPassword.error ? authErrorMessage(setPassword.error) : null;
+  const activateErr = activate.error ? authErrorMessage(activate.error) : null;
 
   const currentLang = i18n.language as LanguageCode;
   const languageNative =
@@ -83,8 +79,11 @@ export const LoginScreen = () => {
   function resetOtpState() {
     setCode('');
     setDestination('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setSetupTouched(false);
     requestOtp.reset();
-    verifyOtp.reset();
+    activate.reset();
   }
 
   function handleChangeChannel(next: Channel) {
@@ -116,49 +115,34 @@ export const LoginScreen = () => {
   }
 
   function handleSendOtp() {
-    verifyOtp.reset();
+    activate.reset();
     setCode('');
     requestOtp.mutate(identifier, {
       onSuccess: (challenge) => {
         setDestination(challenge.destination);
-        setMode('otp-verify');
+        setMode('otp-activate');
       },
     });
   }
 
-  function handleVerifyOtp() {
-    verifyOtp.mutate({ identifier, code, roleKey });
-  }
-
   function handleChangeIdentifierInSetup() {
     setMode('otp-request');
-    setCode('');
-    setDestination('');
-    verifyOtp.reset();
-    requestOtp.reset();
+    resetOtpState();
   }
 
   const passwordsMatch = newPassword.length > 0 && newPassword === confirmPassword;
   const newPasswordValid = newPassword.length >= MIN_PASSWORD_LEN;
+  const codeValid = code.length === 6;
   const showMismatch = setupTouched && confirmPassword.length > 0 && !passwordsMatch;
   const showTooShort = setupTouched && newPassword.length > 0 && !newPasswordValid;
 
-  function handleSetPassword() {
+  function handleActivate() {
     setSetupTouched(true);
-    if (!newPasswordValid || !passwordsMatch) return;
-    setPassword.mutate(newPassword);
+    if (!codeValid || !newPasswordValid || !passwordsMatch) return;
+    activate.mutate({ identifier, code, roleKey, password: newPassword });
   }
 
   const accent = colors.primary;
-
-  function handleCancelPasswordSetup() {
-    backToPasswordLogin();
-    setNewPassword('');
-    setConfirmPassword('');
-    setSetupTouched(false);
-    setPassword.reset();
-    cancelPasswordSetup();
-  }
 
   // Shared across both branches below so the language picker overlay is always
   // reachable, regardless of which screen (login vs. set-password) is showing.
@@ -170,66 +154,6 @@ export const LoginScreen = () => {
       onClose={() => setLangOpen(false)}
     />
   );
-
-  if (pendingPasswordSetup) {
-    return (
-      <SafeAreaView
-        style={[styles.safeArea, { backgroundColor: colors.bg }]}
-        edges={['left', 'right', 'bottom']}
-      >
-        {languagePicker}
-
-        <BrandCap onPressLanguage={() => setLangOpen(true)} languageNative={languageNative} />
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.greetingBlock}>
-            <Text style={[TextScale.hero, { color: colors.ink }]}>{t('setPassword.title')}</Text>
-            <Text style={[TextScale.body, { color: colors.inkSoft }]}>{t('setPassword.subtitle')}</Text>
-          </View>
-
-          <TextField
-            testID="set-password-new-input"
-            value={newPassword}
-            onChangeText={(v) => { setNewPassword(v); setSetupTouched(true); }}
-            accent={accent}
-            icon="lock"
-            placeholder={t('setPassword.newPassword')}
-            secureTextEntry
-            error={showTooShort ? t('setPassword.tooShort') : undefined}
-          />
-          <TextField
-            testID="set-password-confirm-input"
-            value={confirmPassword}
-            onChangeText={(v) => { setConfirmPassword(v); setSetupTouched(true); }}
-            accent={accent}
-            icon="lock"
-            placeholder={t('setPassword.confirmPassword')}
-            secureTextEntry
-            error={showMismatch ? t('setPassword.mismatch') : undefined}
-          />
-          {setPasswordErr && (
-            <Text style={[TextScale.caption, { color: colors.danger }]}>{setPasswordErr}</Text>
-          )}
-
-          <Btn
-            testID="set-password-cta"
-            label={t('setPassword.cta')}
-            onPress={handleSetPassword}
-            loading={setPassword.isPending}
-            accent={accent}
-          />
-
-          <Pressable onPress={handleCancelPasswordSetup}>
-            <Text style={[TextScale.button, { color: accent }]}>{t('common.back')}</Text>
-          </Pressable>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView
@@ -254,8 +178,8 @@ export const LoginScreen = () => {
             {t('login.greeting')}
           </Text>
           <Text style={[TextScale.body, { color: colors.inkSoft }]}>
-            {mode === 'otp-verify'
-              ? t('login.enterCode')
+            {mode === 'otp-activate'
+              ? t('login.otpActivateSubtitle')
               : mode === 'otp-request'
                 ? t('login.otpSetupSubtitle')
                 : t('login.subtitle')}
@@ -362,7 +286,7 @@ export const LoginScreen = () => {
           </>
         )}
 
-        {mode === 'otp-verify' && (
+        {mode === 'otp-activate' && (
           <>
             <Text style={[TextScale.caption, styles.codeSentText, { color: colors.inkSoft }]}>
               {t('login.codeSentTo', { destination })}
@@ -376,15 +300,37 @@ export const LoginScreen = () => {
               placeholder={t('login.enterCode')}
               keyboardType="number-pad"
               maxLength={6}
-              error={verifyErr ?? undefined}
             />
+            <TextField
+              testID="set-password-new-input"
+              value={newPassword}
+              onChangeText={(v) => { setNewPassword(v); setSetupTouched(true); }}
+              accent={accent}
+              icon="lock"
+              placeholder={t('setPassword.newPassword')}
+              secureTextEntry
+              error={showTooShort ? t('setPassword.tooShort') : undefined}
+            />
+            <TextField
+              testID="set-password-confirm-input"
+              value={confirmPassword}
+              onChangeText={(v) => { setConfirmPassword(v); setSetupTouched(true); }}
+              accent={accent}
+              icon="lock"
+              placeholder={t('setPassword.confirmPassword')}
+              secureTextEntry
+              error={showMismatch ? t('setPassword.mismatch') : undefined}
+            />
+            {activateErr && (
+              <Text style={[TextScale.caption, { color: colors.danger }]}>{activateErr}</Text>
+            )}
 
             <Btn
-              testID="verify-cta"
-              label={t('login.verifyOtp')}
-              onPress={handleVerifyOtp}
-              loading={verifyOtp.isPending}
-              disabled={code.length !== 6}
+              testID="activate-cta"
+              label={t('login.verifyAndCreate')}
+              onPress={handleActivate}
+              loading={activate.isPending}
+              disabled={!codeValid || !newPasswordValid || !passwordsMatch}
               accent={accent}
             />
 

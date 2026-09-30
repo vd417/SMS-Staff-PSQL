@@ -22,6 +22,8 @@
   "login.invalidPassword": "अपना पासवर्ड दर्ज करें",
   "login.firstTimeOrForgot": "पहली बार आए हैं? पासवर्ड भूल गए?",
   "login.otpSetupSubtitle": "पासवर्ड सेट करने के लिए हम आपको एक बार का कोड भेजेंगे",
+  "login.otpActivateSubtitle": "हमने भेजा कोड दर्ज करें, फिर अपना पासवर्ड बनाएं",
+  "login.verifyAndCreate": "सत्यापित करें और पासवर्ड बनाएं",
   "login.backToPasswordLogin": "पासवर्ड लॉगिन पर वापस जाएं",
   "setPassword.title": "अपना पासवर्ड सेट करें",
   "setPassword.subtitle": "आगे के लॉगिन के लिए एक पासवर्ड चुनें",

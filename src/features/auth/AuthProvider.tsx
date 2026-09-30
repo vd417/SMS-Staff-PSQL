@@ -17,15 +17,12 @@ type Status = 'loading' | 'authenticated' | 'unauthenticated';
 interface AuthValue {
   status: Status;
   session: Session | null;
-  /** Set once OTP verify succeeds; the caller must set a password before this
-   *  becomes the real session (see completePasswordSetup). Non-null means the
-   *  Set Password screen should be showing. */
-  pendingPasswordSetup: Session | null;
   requestOtp: (identifier: string) => Promise<OtpChallenge>;
-  signInWithOtp: (identifier: string, code: string, roleKey: Role) => Promise<void>;
+  /** First-time / forgot-password activation in one step: verify the OTP (which
+   *  issues live tokens), set the chosen password with them, then establish the
+   *  session. The OTP entry and password creation live on a single screen. */
+  activateWithOtp: (identifier: string, code: string, roleKey: Role, password: string) => Promise<void>;
   signInWithPassword: (identifier: string, password: string, roleKey: Role) => Promise<void>;
-  completePasswordSetup: (password: string) => Promise<void>;
-  cancelPasswordSetup: () => void;
   signOut: () => Promise<void>;
 }
 const AuthContext = createContext<AuthValue | null>(null);
@@ -35,7 +32,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { setRole } = useTheme();
   const [status, setStatus] = useState<Status>('loading');
   const [session, setSession] = useState<Session | null>(null);
-  const [pendingPasswordSetup, setPendingPasswordSetup] = useState<Session | null>(null);
 
   // The client-tapped role tile on the login screen is only a preview/hint —
   // the session's roleKey (ultimately sourced from Staff.Role on the backend)
@@ -106,7 +102,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     authSnapshot.clear();
     queryClient.clear();
     setSession(null);
-    setPendingPasswordSetup(null);
     setStatus('unauthenticated');
   }), []);
 
@@ -124,17 +119,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [repos],
   );
 
-  // OTP verify only ever feeds the password-setup flow now: it authenticates
-  // with the backend (tokens are live) but must not flip app status to
-  // 'authenticated' until a password is set, so the pending session is held
-  // here instead of passed to establishSession.
-  const signInWithOtp = useCallback(
-    async (identifier: string, code: string, roleKey: Role) => {
+  // First-time / forgot-password activation in one step. Verifying the OTP
+  // issues live access + refresh tokens; the snapshot must carry the new access
+  // token before set-password goes out (it's an [Authorize] call). Only once the
+  // password is set do we establish the session and flip status to
+  // 'authenticated' — so a half-finished activation never leaves the user logged
+  // in without a password. If set-password fails the error propagates to the
+  // caller and no local session is stored; the user stays on the activation
+  // screen to retry.
+  const activateWithOtp = useCallback(
+    async (identifier: string, code: string, roleKey: Role, password: string) => {
       const s = await repos.auth.verifyOtp(identifier, code, roleKey);
       authSnapshot.set({ accessToken: s.accessToken, tenantId: s.tenant.id });
-      setPendingPasswordSetup(s);
+      await repos.auth.setPassword(password);
+      await establishSession(s);
     },
-    [repos],
+    [repos, establishSession],
   );
 
   const signInWithPassword = useCallback(
@@ -144,28 +144,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     },
     [repos, establishSession],
   );
-
-  const completePasswordSetup = useCallback(
-    async (password: string) => {
-      if (!pendingPasswordSetup) throw new Error('completePasswordSetup called with no pending session');
-      await repos.auth.setPassword(password);
-      const s = pendingPasswordSetup;
-      setPendingPasswordSetup(null);
-      await establishSession(s);
-    },
-    [repos, pendingPasswordSetup, establishSession],
-  );
-
-  const cancelPasswordSetup = useCallback(() => {
-    // By this point OTP verify has already issued real access + refresh tokens
-    // server-side. Fire-and-forget a logout so they're revoked instead of
-    // sitting valid for their full TTL — don't await it (a cancel action must
-    // not block on the network) and swallow any failure (cancelling must
-    // always succeed locally regardless of network state).
-    void repos.auth.logout(pendingPasswordSetup?.refreshToken ?? null).catch(() => {});
-    authSnapshot.clear();
-    setPendingPasswordSetup(null);
-  }, [repos, pendingPasswordSetup]);
 
   const signOut = useCallback(async () => {
     try {
@@ -178,17 +156,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       authSnapshot.clear();
       queryClient.clear();
       setSession(null);
-      setPendingPasswordSetup(null);
       setStatus('unauthenticated');
     }
   }, [repos, session]);
 
   const value = useMemo<AuthValue>(
     () => ({
-      status, session, pendingPasswordSetup,
-      requestOtp, signInWithOtp, signInWithPassword, completePasswordSetup, cancelPasswordSetup, signOut,
+      status, session,
+      requestOtp, activateWithOtp, signInWithPassword, signOut,
     }),
-    [status, session, pendingPasswordSetup, requestOtp, signInWithOtp, signInWithPassword, completePasswordSetup, cancelPasswordSetup, signOut],
+    [status, session, requestOtp, activateWithOtp, signInWithPassword, signOut],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

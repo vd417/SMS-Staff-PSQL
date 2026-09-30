@@ -34,7 +34,7 @@ it('tapping "first time / forgot password" enters the OTP flow', async () => {
   expect(queryByTestId('password-input')).toBeNull();
 });
 
-it('sending an OTP from the setup flow advances to the verification step', async () => {
+it('sending an OTP shows the code and password fields together on one screen', async () => {
   const { getByTestId, queryByTestId } = renderLogin();
   await waitFor(() => getByTestId('first-time-link'));
   fireEvent.press(getByTestId('first-time-link'));
@@ -42,11 +42,16 @@ it('sending an OTP from the setup flow advances to the verification step', async
   fireEvent.changeText(getByTestId('phone-input'), '98765 43210');
   await waitFor(() => expect(getByTestId('send-otp-cta').props.accessibilityState?.disabled).toBe(false));
   fireEvent.press(getByTestId('send-otp-cta'));
+  // OTP entry and password creation are on the same screen now.
   await waitFor(() => getByTestId('otp-input'));
-  expect(queryByTestId('verify-cta')).toBeTruthy();
+  expect(getByTestId('set-password-new-input')).toBeTruthy();
+  expect(getByTestId('set-password-confirm-input')).toBeTruthy();
+  expect(getByTestId('activate-cta')).toBeTruthy();
+  // The old two-step verify button is gone.
+  expect(queryByTestId('verify-cta')).toBeNull();
 });
 
-it('verifying the OTP in the setup flow shows the Set Password screen instead of logging in', async () => {
+it('the activate CTA stays disabled until code, password and confirmation are all valid', async () => {
   const { getByTestId } = renderLogin();
   await waitFor(() => getByTestId('first-time-link'));
   fireEvent.press(getByTestId('first-time-link'));
@@ -54,8 +59,13 @@ it('verifying the OTP in the setup flow shows the Set Password screen instead of
   fireEvent.changeText(getByTestId('phone-input'), '98765 43210');
   await waitFor(() => expect(getByTestId('send-otp-cta').props.accessibilityState?.disabled).toBe(false));
   fireEvent.press(getByTestId('send-otp-cta'));
-  await waitFor(() => getByTestId('otp-input'));
+  await waitFor(() => getByTestId('activate-cta'));
+
+  expect(getByTestId('activate-cta').props.accessibilityState?.disabled).toBe(true);
   fireEvent.changeText(getByTestId('otp-input'), '123456');
-  fireEvent.press(getByTestId('verify-cta'));
-  await waitFor(() => getByTestId('set-password-new-input'));
+  expect(getByTestId('activate-cta').props.accessibilityState?.disabled).toBe(true);
+  fireEvent.changeText(getByTestId('set-password-new-input'), 'hunter2222');
+  expect(getByTestId('activate-cta').props.accessibilityState?.disabled).toBe(true);
+  fireEvent.changeText(getByTestId('set-password-confirm-input'), 'hunter2222');
+  await waitFor(() => expect(getByTestId('activate-cta').props.accessibilityState?.disabled).toBe(false));
 });

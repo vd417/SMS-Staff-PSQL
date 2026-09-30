@@ -7,11 +7,11 @@ export function useRequestOtp() {
   return useMutation({ mutationFn: (identifier: string) => requestOtp(identifier) });
 }
 
-export function useVerifyOtp() {
-  const { signInWithOtp } = useAuth();
+export function useActivateWithOtp() {
+  const { activateWithOtp } = useAuth();
   return useMutation({
-    mutationFn: ({ identifier, code, roleKey }: { identifier: string; code: string; roleKey: Role }) =>
-      signInWithOtp(identifier, code, roleKey),
+    mutationFn: ({ identifier, code, roleKey, password }: { identifier: string; code: string; roleKey: Role; password: string }) =>
+      activateWithOtp(identifier, code, roleKey, password),
   });
 }
 
@@ -21,11 +21,6 @@ export function useLogin() {
     mutationFn: ({ identifier, password, roleKey }: { identifier: string; password: string; roleKey: Role }) =>
       signInWithPassword(identifier, password, roleKey),
   });
-}
-
-export function useSetPassword() {
-  const { completePasswordSetup } = useAuth();
-  return useMutation({ mutationFn: (password: string) => completePasswordSetup(password) });
 }
 
 export function useLogout() {
