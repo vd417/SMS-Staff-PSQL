@@ -12,6 +12,7 @@ import { useRouteGeometry } from '@/features/trip/useRouteGeometry';
 import { useStopProgress } from '@/features/trip/useStopProgress';
 import { stopActionMessage } from '@/features/trip/stopActionMessage';
 import { useResumeBroadcast } from '@/features/trip/useResumeBroadcast';
+import { nextFollowCamera, FOLLOW_DEFAULT_ZOOM, type CameraState } from '@/features/trip/followCamera';
 import type { StopAction } from '@/features/trip/stopProgress';
 import { LiveMapView } from '@/features/map/LiveMapView';
 import { toMapCoords } from '@/features/map/toMapCoords';
@@ -49,6 +50,12 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
   const geometry = useRouteGeometry(assignment.data?.route.id);
   const mapRef = useRef<LiveMapHandle>(null);
   const hasFitRef = useRef(false);
+  // Follow mode: camera tracks the driver (bearing + tilt) until the driver pans
+  // the map by hand; the Re-center button turns it back on. camStateRef carries
+  // the last applied bearing/zoom so transitions ease instead of jumping — kept in
+  // a ref (not state) so the ~5s GPS cadence never triggers a re-render for camera.
+  const [followMode, setFollowMode] = useState(true);
+  const camStateRef = useRef<CameraState>({ heading: 0, zoom: FOLLOW_DEFAULT_ZOOM });
   const [liveMarker, setLiveMarker] = useState<LiveMarker | null>(null);
   const [lastPingAt, setLastPingAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -149,12 +156,33 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stops, mapReady]);
 
+  // Follow the driver imperatively on each GPS fix (no state churn). Skips fixes
+  // with poor accuracy and freezes bearing at low speed (see followCamera).
+  useEffect(() => {
+    if (!followMode || !mapReady || !liveMarker) return;
+    const next = nextFollowCamera(camStateRef.current, liveMarker);
+    if (!next) return;
+    camStateRef.current = next.state;
+    mapRef.current?.animateCamera(next.camera, { duration: 500 });
+  }, [liveMarker, followMode, mapReady]);
+
+  // The driver dragged/zoomed the map by hand — stop auto-following until they
+  // tap Re-center.
+  const onUserPan = () => setFollowMode(false);
+
   const onRecenter = () => {
     if (!liveMarker || !mapReady) return;
-    mapRef.current?.animateToRegion(
-      { latitude: liveMarker.latitude, longitude: liveMarker.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 },
-      500
-    );
+    setFollowMode(true);
+    const next = nextFollowCamera(camStateRef.current, liveMarker);
+    if (next) {
+      camStateRef.current = next.state;
+      mapRef.current?.animateCamera(next.camera, { duration: 500 });
+    } else {
+      mapRef.current?.animateToRegion(
+        { latitude: liveMarker.latitude, longitude: liveMarker.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 },
+        500
+      );
+    }
   };
 
   const runStopAction = (action: StopAction, onDone?: () => void) => {
@@ -201,7 +229,7 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
         ) : assignment.isError ? (
           <ErrorState onRetry={assignment.refetch} />
         ) : (
-          <LiveMapView ref={mapRef} stops={stops} liveMarker={liveMarker} onMapReady={() => setMapReady(true)} routeGeometry={geometry.data} />
+          <LiveMapView ref={mapRef} stops={stops} liveMarker={liveMarker} onMapReady={() => setMapReady(true)} routeGeometry={geometry.data} onUserPan={onUserPan} />
         )}
       </View>
 

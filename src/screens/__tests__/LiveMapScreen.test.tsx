@@ -6,9 +6,12 @@ import { LiveMapScreen } from '@/screens/LiveMapScreen';
 
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
 
+// Lets tests emit additional GPS fixes after the initial one.
+const mockLoc: { emit?: (loc: unknown) => void } = {};
 jest.mock('expo-location', () => ({
   requestForegroundPermissionsAsync: jest.fn(async () => ({ status: 'granted' })),
-  watchPositionAsync: jest.fn(async (_opts, cb) => {
+  watchPositionAsync: jest.fn(async (_opts: unknown, cb: (loc: unknown) => void) => {
+    mockLoc.emit = cb;
     cb({ coords: { latitude: 12.11, longitude: 77.11 } });
     return { remove: jest.fn() };
   }),
@@ -51,18 +54,19 @@ jest.mock('@/features/trip/useRouteGeometry', () => ({
 
 jest.mock('@/features/trip/useResumeBroadcast', () => ({ useResumeBroadcast: () => undefined }));
 
-const mockMapHandle = { animateToRegion: jest.fn(), fitToCoordinates: jest.fn() };
+const mockMapHandle = { animateToRegion: jest.fn(), fitToCoordinates: jest.fn(), animateCamera: jest.fn() };
 
 jest.mock('@/features/map/LiveMapView', () => {
   const React = require('react');
   const { View, Text } = require('react-native');
-  const LiveMapView = React.forwardRef(({ stops, liveMarker, onMapReady }: any, ref: any) => {
+  const LiveMapView = React.forwardRef(({ stops, liveMarker, onMapReady, onUserPan }: any, ref: any) => {
     React.useImperativeHandle(ref, () => mockMapHandle);
     React.useEffect(() => { onMapReady?.(); }, [onMapReady]);
     return (
       <View testID="live-map-view">
         <Text testID="stop-count">{stops.length}</Text>
         {liveMarker && <Text testID="has-live-marker">yes</Text>}
+        <Text testID="sim-pan" onPress={() => onUserPan?.()}>pan</Text>
       </View>
     );
   });
@@ -84,6 +88,7 @@ describe('LiveMapScreen', () => {
   beforeEach(() => {
     mockMapHandle.animateToRegion.mockClear();
     mockMapHandle.fitToCoordinates.mockClear();
+    mockMapHandle.animateCamera.mockClear();
     mockAssignment.data.route.stops = originalStops;
     mockRoster.data = [{ id: 'st1', name: 'Riya', stopId: 's2' }];
     mockBoarding.data = [];
@@ -117,14 +122,36 @@ describe('LiveMapScreen', () => {
     expect(getByTestId('view-students-btn')).toBeTruthy();
   });
 
-  it('recenters the map on the live marker when the recenter button is pressed', async () => {
+  it('follows the driver: animates the camera onto the live marker on a GPS fix', async () => {
     const { getByTestId } = renderScreen();
     await waitFor(() => expect(getByTestId('has-live-marker')).toBeTruthy());
-    fireEvent.press(getByTestId('recenter-btn'));
-    expect(mockMapHandle.animateToRegion).toHaveBeenCalledWith(
-      expect.objectContaining({ latitude: 12.11, longitude: 77.11 }),
-      expect.any(Number)
+    await waitFor(() =>
+      expect(mockMapHandle.animateCamera).toHaveBeenCalledWith(
+        expect.objectContaining({ center: expect.objectContaining({ latitude: 12.11, longitude: 77.11 }) }),
+        expect.any(Object)
+      )
     );
+  });
+
+  it('recenters via an animated camera move and restores follow when the recenter button is pressed', async () => {
+    const { getByTestId } = renderScreen();
+    await waitFor(() => expect(getByTestId('has-live-marker')).toBeTruthy());
+    mockMapHandle.animateCamera.mockClear();
+    fireEvent.press(getByTestId('recenter-btn'));
+    expect(mockMapHandle.animateCamera).toHaveBeenCalledWith(
+      expect.objectContaining({ center: expect.objectContaining({ latitude: 12.11, longitude: 77.11 }) }),
+      expect.any(Object)
+    );
+  });
+
+  it('stops following after the driver pans the map by hand', async () => {
+    const { getByTestId } = renderScreen();
+    await waitFor(() => expect(getByTestId('has-live-marker')).toBeTruthy());
+    fireEvent.press(getByTestId('sim-pan'));
+    mockMapHandle.animateCamera.mockClear();
+    // A new GPS fix should NOT move the camera once follow is off.
+    act(() => mockLoc.emit?.({ coords: { latitude: 12.5, longitude: 77.5 } }));
+    expect(mockMapHandle.animateCamera).not.toHaveBeenCalled();
   });
 
   it('renders the map with stops and the live marker once GPS resolves', async () => {

@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useImperativeHandle, useRef } from 'react';
 import { View, StyleSheet } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useTheme } from '@/theme';
@@ -14,8 +14,16 @@ import type { LiveMapViewProps, LiveMapHandle } from './liveMapTypes';
 
 export type { LiveMapViewProps, LiveMapHandle };
 
-export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops, liveMarker, onMapReady, routeGeometry }, ref) => {
+export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops, liveMarker, onMapReady, routeGeometry, onUserPan }, ref) => {
   const { colors } = useTheme();
+  const mapRef = useRef<MapView>(null);
+
+  useImperativeHandle(ref, () => ({
+    animateToRegion: (region, duration) => mapRef.current?.animateToRegion(region, duration),
+    fitToCoordinates: (coordinates, options) => mapRef.current?.fitToCoordinates(coordinates, options),
+    animateCamera: (camera, options) => mapRef.current?.animateCamera(camera, options),
+  }), []);
+
   const coords = toMapCoords(stops);
   const initial = coords[0] ?? { latitude: 0, longitude: 0 };
   const roles = stopRoles(stops, liveMarker ?? null);
@@ -28,10 +36,11 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
     <View style={styles.container}>
       <MapView
         testID="live-map"
-        ref={ref as never}
+        ref={mapRef}
         style={styles.map}
         provider={PROVIDER_GOOGLE}
         onMapReady={onMapReady}
+        onPanDrag={onUserPan}
         initialRegion={{ ...initial, latitudeDelta: 0.05, longitudeDelta: 0.05 }}
       >
         {roadPath && roadPath.length > 1 && (
