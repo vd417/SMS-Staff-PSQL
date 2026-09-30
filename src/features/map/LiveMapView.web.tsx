@@ -17,6 +17,9 @@ export type { LiveMapViewProps, LiveMapHandle };
 export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops, liveMarker, onMapReady, routeGeometry }, ref) => {
   const { colors } = useTheme();
   const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+  // Optional Cloud-based Map ID (enables vector maps / cloud styling). Undefined
+  // is fine — the map falls back to the default raster style.
+  const mapId = process.env.EXPO_PUBLIC_GOOGLE_MAPS_MAP_ID || undefined;
   const coords = toMapCoords(stops);
   const initial = coords[0] ?? { latitude: 0, longitude: 0 };
   const roles = stopRoles(stops, liveMarker ?? null);
@@ -41,6 +44,7 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
         provider="google"
         style={styles.map}
         googleMapsApiKey={apiKey}
+        googleMapsMapId={mapId}
         onMapReady={onMapReady}
         initialRegion={{ ...initial, latitudeDelta: 0.05, longitudeDelta: 0.05 }}
       >

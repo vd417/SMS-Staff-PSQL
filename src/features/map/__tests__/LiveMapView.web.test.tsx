@@ -37,8 +37,11 @@ const stopsWithEta: Stop[] = [
 
 describe('LiveMapView (web)', () => {
   const OLD_ENV = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const OLD_MAP_ID = process.env.EXPO_PUBLIC_GOOGLE_MAPS_MAP_ID;
   afterEach(() => {
     process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY = OLD_ENV;
+    if (OLD_MAP_ID === undefined) delete process.env.EXPO_PUBLIC_GOOGLE_MAPS_MAP_ID;
+    else process.env.EXPO_PUBLIC_GOOGLE_MAPS_MAP_ID = OLD_MAP_ID;
     mockMapViewProps.length = 0;
   });
 
@@ -64,6 +67,14 @@ describe('LiveMapView (web)', () => {
     renderWithTheme(<LiveMapView stops={stops} liveMarker={null} />);
     expect(mockMapViewProps).toHaveLength(1);
     expect(mockMapViewProps[0].provider).toBe('google');
+  });
+
+  it('passes googleMapsMapId to the MapView when a Map ID is configured', () => {
+    process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY = 'test-key';
+    process.env.EXPO_PUBLIC_GOOGLE_MAPS_MAP_ID = 'test-map-id';
+    renderWithTheme(<LiveMapView stops={stops} liveMarker={null} />);
+    expect(mockMapViewProps).toHaveLength(1);
+    expect(mockMapViewProps[0].googleMapsMapId).toBe('test-map-id');
   });
 
   it('highlights the nearest stop as the destination and marks earlier stops completed', () => {
