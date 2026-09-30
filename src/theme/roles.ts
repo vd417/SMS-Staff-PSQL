@@ -19,7 +19,7 @@ export interface RoleConfig {
 export const ROLES: Record<Role, RoleConfig> = {
   driver: {
     key: 'driver', labelKey: 'role.driver', icon: 'bus',
-    accent: '#E08A3C', accentSoft: '#FBE7CC', dutyPostLabelKey: 'dutyPost.driver', roleCardKind: 'driver',
+    accent: '#0E5C4A', accentSoft: '#CDE7DF', dutyPostLabelKey: 'dutyPost.driver', roleCardKind: 'driver',
   },
   conductor: {
     key: 'conductor', labelKey: 'role.conductor', icon: 'visitor',

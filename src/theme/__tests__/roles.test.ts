@@ -23,7 +23,7 @@ describe('ROLES', () => {
     });
   });
   it('driver uses the handoff accent and conductor has its own accent', () => {
-    expect(ROLES.driver.accent).toBe('#E08A3C');
+    expect(ROLES.driver.accent).toBe('#0E5C4A');
     expect(ROLES.conductor.accent).toBe('#C2567E');
   });
 });
