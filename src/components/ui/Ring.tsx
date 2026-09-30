@@ -34,7 +34,11 @@ export const Ring: React.FC<RingProps> = ({
 
   return (
     <View style={[styles.container, { width: size, height: size }]}>
-      <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
+      {/* Rotate the whole SVG -90° so the progress arc starts at 12 o'clock. Done
+          via an RN style transform (camelCase, centered) rather than the Circle's
+          `origin`/`rotation` props, which react-native-svg-web renders as an
+          invalid kebab-case `transform-origin` DOM attribute. */}
+      <Svg width={size} height={size} style={[StyleSheet.absoluteFill, styles.rotated]}>
         {/* Track circle */}
         <Circle
           cx={cx}
@@ -55,8 +59,6 @@ export const Ring: React.FC<RingProps> = ({
           strokeDasharray={`${circumference} ${circumference}`}
           strokeDashoffset={dashOffset}
           strokeLinecap="round"
-          rotation="-90"
-          origin={`${cx}, ${cy}`}
         />
       </Svg>
       {/* Center labels — constrained to the ring's inner circle so a long sublabel
@@ -78,6 +80,9 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  rotated: {
+    transform: [{ rotate: '-90deg' }],
   },
   center: {
     alignItems: 'center',
