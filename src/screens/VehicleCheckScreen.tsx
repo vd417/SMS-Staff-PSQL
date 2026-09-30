@@ -117,6 +117,7 @@ export const VehicleCheckScreen: React.FC<VehicleCheckScreenProps> = ({ navigati
                 onPress={onSubmitInspection}
                 accent={role.accent}
                 loading={submitInspection.isPending}
+                disabled={inspectionSubmitted}
                 style={styles.cta}
               />
               {inspectionSubmitted ? (
@@ -133,7 +134,7 @@ export const VehicleCheckScreen: React.FC<VehicleCheckScreenProps> = ({ navigati
                 placeholder={t('vehicleCheck.odometer')}
                 placeholderTextColor={colors.inkFaint}
                 value={odometerKm}
-                onChangeText={setOdometerKm}
+                onChangeText={(v) => { setOdometerKm(v); setFuelSaved(false); }}
                 keyboardType="numeric"
                 style={[styles.input, { borderColor: colors.sunken, color: colors.ink }]}
               />
@@ -142,7 +143,7 @@ export const VehicleCheckScreen: React.FC<VehicleCheckScreenProps> = ({ navigati
                 placeholder={t('vehicleCheck.fuelAdded')}
                 placeholderTextColor={colors.inkFaint}
                 value={fuelAddedLiters}
-                onChangeText={setFuelAddedLiters}
+                onChangeText={(v) => { setFuelAddedLiters(v); setFuelSaved(false); }}
                 keyboardType="numeric"
                 style={[styles.input, { borderColor: colors.sunken, color: colors.ink }]}
               />
@@ -152,6 +153,7 @@ export const VehicleCheckScreen: React.FC<VehicleCheckScreenProps> = ({ navigati
                 onPress={onSaveFuelLog}
                 variant="ghost"
                 loading={submitFuelLog.isPending}
+                disabled={fuelSaved}
                 style={styles.cta}
               />
               {fuelSaved ? (

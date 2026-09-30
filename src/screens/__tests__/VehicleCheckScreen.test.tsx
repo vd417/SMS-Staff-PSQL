@@ -49,6 +49,26 @@ it('toggles checklist items and submits the inspection for the assigned bus', as
   expect(getByText('Inspection submitted')).toBeTruthy();
 });
 
+it('disables the inspection submit button after a successful submit so it cannot be re-sent', async () => {
+  const { getByTestId, findByTestId } = renderScreen();
+  await findByTestId('vehicle-check-submit');
+  fireEvent.press(getByTestId('vehicle-check-submit'));
+  await waitFor(() => expect(mockSubmitInspection).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(getByTestId('vehicle-check-submit').props.accessibilityState?.disabled).toBe(true));
+  fireEvent.press(getByTestId('vehicle-check-submit'));
+  expect(mockSubmitInspection).toHaveBeenCalledTimes(1);
+});
+
+it('disables the fuel save button after a successful save', async () => {
+  const { getByTestId, findByTestId } = renderScreen();
+  await findByTestId('fuel-log-odometer');
+  fireEvent.changeText(getByTestId('fuel-log-odometer'), '45210');
+  fireEvent.changeText(getByTestId('fuel-log-liters'), '30');
+  fireEvent.press(getByTestId('fuel-log-save'));
+  await waitFor(() => expect(mockSubmitFuelLog).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(getByTestId('fuel-log-save').props.accessibilityState?.disabled).toBe(true));
+});
+
 it('saves a fuel log entry with numeric odometer and litres', async () => {
   const { getByTestId, getByText, findByTestId } = renderScreen();
   await findByTestId('fuel-log-odometer');
