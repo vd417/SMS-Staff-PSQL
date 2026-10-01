@@ -118,6 +118,26 @@ export const TripScreen = ({ navigation }: { navigation: any }) => {
   const tripStops = useTripStops(trip?.id, !!trip);
   useResumeBroadcast(trip, () => toast.show(t('trip.resumeFailed'), 'error'));
 
+  // Vehicle inspection + fuel log: reachable to transport staff whether a trip is
+  // live or not, so the pre-trip and active-trip branches render the same section.
+  const vehicleChecks =
+    role.key === 'driver' || role.key === 'conductor' ? (
+      <>
+        {assignment.data && <VehicleCard busId={assignment.data.busId} navigation={navigation} />}
+        <Card>
+          <Text style={[TextScale.cardTitle, { color: colors.ink }]}>{t('trip.safety')}</Text>
+          <Text style={[TextScale.caption, { color: colors.inkSoft, marginTop: 4, marginBottom: 10 }]}>{t('trip.safetyHint')}</Text>
+          <Btn
+            testID="trip-vehicle-check"
+            label={t('home.vehicleCheck')}
+            icon="check"
+            variant="ghost"
+            onPress={() => navigation.navigate('VehicleCheck')}
+          />
+        </Card>
+      </>
+    ) : null;
+
   const onStart = async () => {
     if (!assignment.data) return;
     let started;
@@ -215,6 +235,7 @@ export const TripScreen = ({ navigation }: { navigation: any }) => {
               style={styles.cta}
             />
             {(role.key === 'driver' || role.key === 'conductor') && <RosterPanel tripId={trip.id} accent={accent} />}
+            {vehicleChecks}
             <Btn testID="trip-end" label={t('trip.end')} onPress={onEnd} accent={colors.danger} loading={endTrip.isPending} style={styles.cta} />
           </>
         ) : (
@@ -276,22 +297,7 @@ export const TripScreen = ({ navigation }: { navigation: any }) => {
                 <ProgressBar testID="pretrip-pickup-progress" now={0} max={assignment.data.studentsAssigned} accent={accent} />
               </Card>
             )}
-            {(role.key === 'driver' || role.key === 'conductor') && assignment.data && (
-              <VehicleCard busId={assignment.data.busId} navigation={navigation} />
-            )}
-            {(role.key === 'driver' || role.key === 'conductor') && (
-              <Card>
-                <Text style={[TextScale.cardTitle, { color: colors.ink }]}>{t('trip.safety')}</Text>
-                <Text style={[TextScale.caption, { color: colors.inkSoft, marginTop: 4, marginBottom: 10 }]}>{t('trip.safetyHint')}</Text>
-                <Btn
-                  testID="trip-vehicle-check"
-                  label={t('home.vehicleCheck')}
-                  icon="check"
-                  variant="ghost"
-                  onPress={() => navigation.navigate('VehicleCheck')}
-                />
-              </Card>
-            )}
+            {vehicleChecks}
             <View style={styles.segment}>
               {(['pickup', 'drop'] as TripDirection[]).map((d) => (
                 <Pressable

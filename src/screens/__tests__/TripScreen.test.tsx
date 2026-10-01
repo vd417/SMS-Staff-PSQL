@@ -122,6 +122,17 @@ it('shows the vehicle card with fallback text when no inspection or fuel records
   expect(nav.navigate).toHaveBeenCalledWith('VehicleCheck');
 });
 
+it('keeps the vehicle card and Vehicle Check button reachable to a driver during an active trip', async () => {
+  const { getByTestId, findByText, nav } = await renderScreen();
+  await findByText(/Route 7/);
+  fireEvent.press(getByTestId('trip-start'));
+  await waitFor(() => expect(getByTestId('trip-end')).toBeTruthy());
+  // Vehicle + fuel check must stay reachable while the trip is live, not only pre-trip.
+  expect(getByTestId('vehicle-last-fuel-entry')).toBeTruthy();
+  fireEvent.press(getByTestId('trip-vehicle-check'));
+  expect(nav.navigate).toHaveBeenCalledWith('VehicleCheck');
+});
+
 it('navigates to LiveMap with the current tripId when "View Live Map" is pressed', async () => {
   const { getByTestId, findByText, nav, repos } = await renderScreen();
   await findByText(/Route 7/);
