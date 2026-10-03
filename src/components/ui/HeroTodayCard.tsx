@@ -61,10 +61,11 @@ export const HeroTodayCard: React.FC<HeroTodayCardProps> = ({
   }, [checkedIn, checkInAt]);
 
   const gradientColors: [string, string] = checkedIn
-    ? [role.accent, role.accentSoft]
+    ? [role.accent, role.accent]
     : [colors.primary, colors.primaryDim];
 
-  const onPrimaryColor = checkedIn ? colors.ink : colors.onPrimary;
+  // Both states now use a full accent/primary background, so text is always light.
+  const onPrimaryColor = colors.onPrimary;
 
   return (
     <LinearGradient
@@ -76,20 +77,20 @@ export const HeroTodayCard: React.FC<HeroTodayCardProps> = ({
       {/* Status pill */}
       <Pill
         label={checkedIn ? t('home.onDuty') : t('home.notCheckedIn')}
-        color={checkedIn ? colors.ink : colors.onPrimary}
+        color={colors.onPrimary}
         bg={checkedIn ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.2)'}
       />
 
       {/* Two columns: timing + duty post */}
       <View style={styles.columns}>
         <View style={styles.column}>
-          <Text style={[TextScale.micro, { color: checkedIn ? colors.inkSoft : 'rgba(255,255,255,0.7)' }]}>
+          <Text style={[TextScale.micro, { color: 'rgba(255,255,255,0.7)' }]}>
             {t('home.timing')}
           </Text>
           <Text style={[TextScale.body, { color: onPrimaryColor }]}>{timing || '—'}</Text>
         </View>
         <View style={styles.column}>
-          <Text style={[TextScale.micro, { color: checkedIn ? colors.inkSoft : 'rgba(255,255,255,0.7)' }]}>
+          <Text style={[TextScale.micro, { color: 'rgba(255,255,255,0.7)' }]}>
             {dutyPostLabel}
           </Text>
           <Text style={[TextScale.body, { color: onPrimaryColor }]}>{dutyPost || '—'}</Text>
