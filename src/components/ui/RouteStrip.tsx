@@ -1,52 +1,72 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Svg, { Line, Circle } from 'react-native-svg';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/theme';
 import { TextScale } from '@/theme/typography';
 import { Card } from './Card';
-import type { Route } from '@/data/domain';
+import type { RouteTimelineStop, RouteTimelineStatus } from '@/features/trip/stopProgress';
 
 export interface RouteStripProps {
-  route: Route;
-  progress: number; // 0..1 along the route
+  /** Every stop on the route, in order, each with its status (see routeTimelineFor). */
+  stops: RouteTimelineStop[];
   accent: string;
-  currentStopName?: string;
-  nextStopName?: string;
 }
 
-const W = 300;
-const H = 64;
-const PAD = 20;
-
-export const RouteStrip: React.FC<RouteStripProps> = ({ route, progress, accent, currentStopName, nextStopName }) => {
+/** Vertical route timeline: one row per stop with its name and status (done / at stop / next). */
+export const RouteStrip: React.FC<RouteStripProps> = ({ stops, accent }) => {
   const { colors } = useTheme();
-  const n = route.stops.length;
-  const xs = route.stops.map((_, i) => (n <= 1 ? PAD : PAD + ((W - 2 * PAD) * i) / (n - 1)));
-  const y = H / 2;
-  const busX = PAD + (W - 2 * PAD) * Math.max(0, Math.min(1, progress));
+  const { t } = useTranslation();
+  if (stops.length === 0) return null;
+
+  const badge = (status: RouteTimelineStatus): string | null =>
+    status === 'done'
+      ? t('trip.stopDone')
+      : status === 'current'
+        ? t('trip.stopAtStop')
+        : status === 'next'
+          ? t('trip.stopNext')
+          : null;
 
   return (
     <Card>
-      <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`}>
-        <Line x1={PAD} y1={y} x2={W - PAD} y2={y} stroke={colors.sunken} strokeWidth={4} strokeLinecap="round" />
-        <Line x1={PAD} y1={y} x2={busX} y2={y} stroke={accent} strokeWidth={4} strokeLinecap="round" />
-        {xs.map((x, i) => (
-          <Circle key={route.stops[i].id} cx={x} cy={y} r={5} fill={x <= busX ? accent : colors.surface} stroke={accent} strokeWidth={2} />
-        ))}
-        <Circle cx={busX} cy={y} r={8} fill={accent} stroke={colors.surface} strokeWidth={3} />
-      </Svg>
-      <View style={styles.labels}>
-        <Text style={[TextScale.caption, { color: colors.inkSoft }]} numberOfLines={1}>
-          {currentStopName ?? route.stops[0]?.name}
-        </Text>
-        <Text style={[TextScale.caption, { color: accent }]} numberOfLines={1}>
-          → {nextStopName ?? route.stops[route.stops.length - 1]?.name}
-        </Text>
-      </View>
+      {stops.map((s, i) => {
+        const filled = s.status === 'done' || s.status === 'current';
+        const active = s.status === 'current' || s.status === 'next';
+        const isLast = i === stops.length - 1;
+        const label = badge(s.status);
+        return (
+          <View key={s.id} style={styles.row} testID={`route-stop-${s.status}`}>
+            <View style={styles.rail}>
+              <View style={[styles.line, { backgroundColor: i === 0 ? 'transparent' : colors.sunken }]} />
+              <View style={[styles.dot, { backgroundColor: filled ? accent : colors.surface, borderColor: accent }]} />
+              <View style={[styles.line, { backgroundColor: isLast ? 'transparent' : colors.sunken }]} />
+            </View>
+            <Text
+              style={[
+                active ? TextScale.bodyStrong : TextScale.body,
+                styles.name,
+                { color: s.status === 'upcoming' ? colors.inkSoft : colors.ink },
+              ]}
+              numberOfLines={1}
+            >
+              {s.name}
+            </Text>
+            {label ? (
+              <Text style={[TextScale.caption, { color: s.status === 'upcoming' ? colors.inkSoft : accent }]}>
+                {label}
+              </Text>
+            ) : null}
+          </View>
+        );
+      })}
     </Card>
   );
 };
 
 const styles = StyleSheet.create({
-  labels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, gap: 8 },
+  row: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
+  rail: { width: 28, alignItems: 'center', alignSelf: 'stretch' },
+  line: { width: 2, flex: 1 },
+  dot: { width: 13, height: 13, borderRadius: 7, borderWidth: 2 },
+  name: { flex: 1, paddingLeft: 6 },
 });

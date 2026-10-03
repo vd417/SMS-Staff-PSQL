@@ -1,4 +1,4 @@
-import { deriveStopProgress, routeStripFor, isAlreadyApplied, isStopResolved } from '../stopProgress';
+import { deriveStopProgress, routeStripFor, routeTimelineFor, isAlreadyApplied, isStopResolved } from '../stopProgress';
 import { AppError } from '@/lib/errors';
 import type { Stop, StudentLite, Boarding, TripStops } from '@/data/domain';
 
@@ -84,6 +84,34 @@ describe('routeStripFor', () => {
     expect(routeStripFor(stops, progress({ currentStopId: 's2' }, ['s1']))).toEqual({ progress: 1 / 3, currentStopName: 'Market', nextStopName: 'Chowk' });
     expect(routeStripFor(stops, progress({}, ['s1']))).toEqual({ progress: 1 / 3, currentStopName: 'Gate', nextStopName: 'Market' });
     expect(routeStripFor(stops, undefined)).toEqual({ progress: 0, currentStopName: undefined, nextStopName: 'Gate' });
+  });
+});
+
+describe('routeTimelineFor', () => {
+  const tl = (p: TripStops | undefined) => routeTimelineFor(stops, p).map((s) => `${s.name}:${s.status}`);
+
+  it('en route to the first stop: first is next, the rest upcoming', () => {
+    expect(tl(progress())).toEqual(['Gate:next', 'Market:upcoming', 'Chowk:upcoming']);
+  });
+
+  it('with no progress yet: first is next', () => {
+    expect(tl(undefined)).toEqual(['Gate:next', 'Market:upcoming', 'Chowk:upcoming']);
+  });
+
+  it('at a stop: current, then next, then upcoming', () => {
+    expect(tl(progress({ currentStopId: 's1' }))).toEqual(['Gate:current', 'Market:next', 'Chowk:upcoming']);
+  });
+
+  it('departed one and at the next: done, current, next', () => {
+    expect(tl(progress({ currentStopId: 's2' }, ['s1']))).toEqual(['Gate:done', 'Market:current', 'Chowk:next']);
+  });
+
+  it('departed one and en route to the next: done, next, upcoming', () => {
+    expect(tl(progress({}, ['s1']))).toEqual(['Gate:done', 'Market:next', 'Chowk:upcoming']);
+  });
+
+  it('all departed: every stop done', () => {
+    expect(tl(progress({}, ['s1', 's2', 's3']))).toEqual(['Gate:done', 'Market:done', 'Chowk:done']);
   });
 });
 

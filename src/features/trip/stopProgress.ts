@@ -84,6 +84,37 @@ export function routeStripFor(
   };
 }
 
+export type RouteTimelineStatus = 'done' | 'current' | 'next' | 'upcoming';
+
+export interface RouteTimelineStop {
+  id: string;
+  name: string;
+  status: RouteTimelineStatus;
+}
+
+/**
+ * The full stop list (by seq) with each stop's status for the route timeline: a departed stop is
+ * 'done', the server-confirmed current stop is 'current', the first stop still to be reached is
+ * 'next', and the rest are 'upcoming'. Same rules as routeStripFor, surfaced per stop.
+ */
+export function routeTimelineFor(stops: Stop[], progress: TripStops | undefined): RouteTimelineStop[] {
+  const sorted = bySeq(stops);
+  const departed = new Set((progress?.stops ?? []).filter((s) => s.departedAt).map((s) => s.stopId));
+  const currentId = progress?.currentStopId ?? null;
+  const nextId = sorted.find((s) => s.id !== currentId && !departed.has(s.id))?.id ?? null;
+  return sorted.map((s) => ({
+    id: s.id,
+    name: s.name,
+    status: (s.id === currentId
+      ? 'current'
+      : departed.has(s.id)
+        ? 'done'
+        : s.id === nextId
+          ? 'next'
+          : 'upcoming') as RouteTimelineStatus,
+  }));
+}
+
 /**
  * A retried or concurrent tap (driver and conductor both pressing) that the server rejects
  * only because the transition already happened is a success, not an error.

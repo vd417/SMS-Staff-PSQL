@@ -13,7 +13,7 @@ import {
 } from '@/features/trip/hooks';
 import { useVehicleInspections, useFuelLogs } from '@/features/vehicleChecks/hooks';
 import { startBroadcast, stopBroadcast } from '@/features/trip/broadcaster';
-import { routeStripFor } from '@/features/trip/stopProgress';
+import { routeTimelineFor } from '@/features/trip/stopProgress';
 import { useResumeBroadcast } from '@/features/trip/useResumeBroadcast';
 import { stopActionMessage } from '@/features/trip/stopActionMessage';
 import { isAppError } from '@/lib/errors';
@@ -211,18 +211,12 @@ export const TripScreen = ({ navigation }: { navigation: any }) => {
             <View style={[styles.banner, { backgroundColor: accent }]}>
               <Text style={[TextScale.bodyStrong, { color: '#FFFFFF' }]}>{t('trip.broadcasting')}</Text>
             </View>
-            {assignment.data && (() => {
-              const strip = routeStripFor(assignment.data.route.stops, tripStops.data);
-              return (
-                <RouteStrip
-                  route={assignment.data.route}
-                  progress={strip.progress}
-                  accent={accent}
-                  currentStopName={strip.currentStopName}
-                  nextStopName={strip.nextStopName}
-                />
-              );
-            })()}
+            {assignment.data && (
+              <RouteStrip
+                stops={routeTimelineFor(assignment.data.route.stops, tripStops.data)}
+                accent={accent}
+              />
+            )}
             <Card>
               <Text style={[TextScale.caption, { color: colors.inkSoft }]}>{t('trip.bus')}</Text>
               <Text style={[TextScale.body, { color: colors.ink }]}>{trip.busNo}</Text>
