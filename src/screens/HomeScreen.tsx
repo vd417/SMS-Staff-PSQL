@@ -121,8 +121,6 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
         </Animated.View>
         <Animated.View entering={FadeInDown.delay(65).duration(300)}>
           <StatTrio
-            hoursThisWeek={d.hoursThisWeek}
-            hoursTarget={d.hoursTarget}
             streakDays={d.streakDays}
             leaveLeft={d.leaveLeft}
           />
