@@ -223,8 +223,19 @@ export const TripScreen = ({ navigation }: { navigation: any }) => {
               />
             )}
             <Card>
-              <Text style={[TextScale.caption, { color: colors.inkSoft }]}>{t('trip.bus')}</Text>
-              <Text style={[TextScale.body, { color: colors.ink }]}>{trip.busNo}</Text>
+              <View style={styles.busCardRow}>
+                <View style={styles.busCardInfo}>
+                  <Text style={[TextScale.caption, { color: colors.inkSoft }]}>{t('trip.bus')}</Text>
+                  <Text style={[TextScale.body, { color: colors.ink }]}>{trip.busNo}</Text>
+                </View>
+                <Pill
+                  testID="trip-direction-pill"
+                  label={t(`trip.dir.${trip.direction}`)}
+                  color="#FFFFFF"
+                  bg={accent}
+                  icon="route"
+                />
+              </View>
             </Card>
             <Btn
               testID="trip-view-map"
@@ -323,6 +334,8 @@ const styles = StyleSheet.create({
   headerSpacer: { flex: 1 },
   body: { padding: 16, gap: 12 },
   banner: { borderRadius: 16, paddingVertical: 12, alignItems: 'center' },
+  busCardRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  busCardInfo: { flex: 1 },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   segment: { flexDirection: 'row', gap: 10 },
   segBtn: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 14, borderWidth: 1.5 },

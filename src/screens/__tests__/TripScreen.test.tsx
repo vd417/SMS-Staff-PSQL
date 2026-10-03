@@ -98,6 +98,23 @@ it('keeps the selected Drop direction on the active screen', async () => {
   expect(getByText(/• Drop/)).toBeTruthy();
 });
 
+it('shows the trip direction as a prominent pill in the Bus card on the active screen', async () => {
+  const { getByTestId, findByText } = await renderScreen();
+  await findByText(/Route 7/);
+  fireEvent.press(getByTestId('trip-start'));
+  await waitFor(() => expect(getByTestId('trip-end')).toBeTruthy());
+  expect(getByTestId('trip-direction-pill')).toHaveTextContent('Pickup');
+});
+
+it('shows the Drop direction pill in the Bus card when Drop was selected', async () => {
+  const { getByTestId, findByText } = await renderScreen();
+  await findByText(/Route 7/);
+  fireEvent.press(getByTestId('trip-dir-drop'));
+  fireEvent.press(getByTestId('trip-start'));
+  await waitFor(() => expect(getByTestId('trip-end')).toBeTruthy());
+  expect(getByTestId('trip-direction-pill')).toHaveTextContent('Drop');
+});
+
 it('shows a pickup progress bar that tracks boarded students', async () => {
   const { getByTestId, findByText, repos } = await renderScreen();
   await findByText(/Route 7/);
