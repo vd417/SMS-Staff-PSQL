@@ -210,6 +210,11 @@ export const TripScreen = ({ navigation }: { navigation: any }) => {
           <>
             <View style={[styles.banner, { backgroundColor: accent }]}>
               <Text style={[TextScale.bodyStrong, { color: '#FFFFFF' }]}>{t('trip.broadcasting')}</Text>
+              <Text testID="trip-direction" style={[TextScale.caption, { color: '#FFFFFF' }]}>
+                {assignment.data
+                  ? `${assignment.data.route.name} • ${t(`trip.dir.${trip.direction}`)}`
+                  : t(`trip.dir.${trip.direction}`)}
+              </Text>
             </View>
             {assignment.data && (
               <RouteStrip

@@ -81,6 +81,23 @@ it('shows the roster panel to a driver once a trip is started', async () => {
   expect(getByTestId('headcount')).toBeTruthy();
 });
 
+it('shows the trip direction (Pickup by default) on the active screen', async () => {
+  const { getByTestId, getByText, findByText } = await renderScreen();
+  await findByText(/Route 7/);
+  fireEvent.press(getByTestId('trip-start'));
+  await waitFor(() => expect(getByTestId('trip-end')).toBeTruthy());
+  expect(getByText(/• Pickup/)).toBeTruthy();
+});
+
+it('keeps the selected Drop direction on the active screen', async () => {
+  const { getByTestId, getByText, findByText } = await renderScreen();
+  await findByText(/Route 7/);
+  fireEvent.press(getByTestId('trip-dir-drop'));
+  fireEvent.press(getByTestId('trip-start'));
+  await waitFor(() => expect(getByTestId('trip-end')).toBeTruthy());
+  expect(getByText(/• Drop/)).toBeTruthy();
+});
+
 it('shows a pickup progress bar that tracks boarded students', async () => {
   const { getByTestId, findByText, repos } = await renderScreen();
   await findByText(/Route 7/);
