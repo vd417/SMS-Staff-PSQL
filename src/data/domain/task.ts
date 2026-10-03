@@ -6,4 +6,5 @@ export interface Task {
   done: boolean;
   dueLabel?: string;
   photoUrl?: string;
+  remark?: string;
 }

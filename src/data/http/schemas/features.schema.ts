@@ -3,7 +3,7 @@ import { opt } from './wire';
 
 export const taskSchema = z.object({
   id: z.string(), title: z.string(), detail: opt(z.string()), priority: z.enum(['urgent', 'normal']),
-  done: z.boolean(), due_label: opt(z.string()), photo_url: opt(z.string()),
+  done: z.boolean(), due_label: opt(z.string()), photo_url: opt(z.string()), remarks: opt(z.string()),
 });
 export const taskListSchema = z.array(taskSchema);
 

@@ -7,7 +7,7 @@ import { taskListSchema } from './schemas/features.schema';
 export function httpTasks(http: HttpClient): TasksRepository {
   return {
     list: () => http.get('/staff/tasks').then((d) => parseWire(taskListSchema, d, 'tasks').map(toTask)),
-    complete: (id) => http.post(`/staff/tasks/${id}/complete`, {}).then((d) => parseWire(taskListSchema, d, 'tasks').map(toTask)),
+    complete: (id, remark) => http.post(`/staff/tasks/${id}/complete`, { remark }).then((d) => parseWire(taskListSchema, d, 'tasks').map(toTask)),
     attachPhoto: (id, photoUri) =>
       http.post(`/staff/tasks/${id}/photo`, { photo_base64: photoUri }).then((d) => parseWire(taskListSchema, d, 'tasks').map(toTask)),
   };

@@ -32,9 +32,22 @@ async function renderScreen() {
   );
 }
 
-it('lists tasks and completes one on tap', async () => {
-  const { findByText, getByTestId } = await renderScreen();
+it('reveals a required remark field on complete, and only completes once a remark is entered', async () => {
+  const { findByText, getByTestId, queryByTestId } = await renderScreen();
   await findByText('Pre-trip bus inspection');
+
+  // Tapping complete reveals the remark input but does NOT complete yet.
   fireEvent.press(getByTestId('task-complete-task_1'));
+  expect(getByTestId('task-remark-input-task_1')).toBeTruthy();
+  expect(queryByTestId('task-done-task_1')).toBeNull();
+
+  // Submit with no remark is a no-op (required).
+  fireEvent.press(getByTestId('task-submit-task_1'));
+  expect(queryByTestId('task-done-task_1')).toBeNull();
+
+  // With a remark, Submit completes the task and shows the remark.
+  fireEvent.changeText(getByTestId('task-remark-input-task_1'), 'All good');
+  fireEvent.press(getByTestId('task-submit-task_1'));
   await waitFor(() => expect(getByTestId('task-done-task_1')).toBeTruthy());
+  await waitFor(() => expect(getByTestId('task-remark-task_1')).toBeTruthy());
 });

@@ -11,10 +11,13 @@ export function mockTasks(store: Store): TasksRepository {
       await simulateLatency();
       return clone(store.tasks);
     },
-    async complete(id: string): Promise<Task[]> {
+    async complete(id: string, remark?: string): Promise<Task[]> {
       await simulateLatency();
       const task = store.tasks.find((t) => t.id === id);
-      if (task) task.done = true;
+      if (task) {
+        task.done = true;
+        if (remark !== undefined) task.remark = remark;
+      }
       return clone(store.tasks);
     },
     async attachPhoto(id: string, photoUri: string): Promise<Task[]> {

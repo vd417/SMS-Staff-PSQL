@@ -16,14 +16,14 @@ export function useCompleteTask() {
   const tenantId = useTenantId();
   const key = queryKeys.tasks(tenantId);
   return useMutation({
-    mutationFn: (id: string) => repos.tasks.complete(id),
-    onMutate: async (id) => {
+    mutationFn: ({ id, remark }: { id: string; remark?: string }) => repos.tasks.complete(id, remark),
+    onMutate: async ({ id, remark }) => {
       await qc.cancelQueries({ queryKey: key });
       const prev = qc.getQueryData<Task[]>(key) ?? [];
-      qc.setQueryData<Task[]>(key, prev.map((t) => (t.id === id ? { ...t, done: true } : t)));
+      qc.setQueryData<Task[]>(key, prev.map((t) => (t.id === id ? { ...t, done: true, remark: remark ?? t.remark } : t)));
       return { prev };
     },
-    onError: (_e, _id, ctx) => { if (ctx) qc.setQueryData(key, ctx.prev); },
+    onError: (_e, _v, ctx) => { if (ctx) qc.setQueryData(key, ctx.prev); },
     // Home's pending-tasks preview is derived from this same task list server-side,
     // so it needs invalidating too or it goes stale after a completion.
     onSettled: () => {
