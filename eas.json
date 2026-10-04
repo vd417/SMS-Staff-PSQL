@@ -15,12 +15,24 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.sms.catretech.me/v1",
+        "EXPO_PUBLIC_DATA_SOURCE": "live",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyCLBnzIqfPTAoo_HnCVMP_nnd57nOMU7GY",
+        "EXPO_PUBLIC_GOOGLE_MAPS_MAP_ID": "aab697c91ef02136bf693efd"
       }
     },
     "production": {
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.sms.catretech.me/v1",
+        "EXPO_PUBLIC_DATA_SOURCE": "live",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyCLBnzIqfPTAoo_HnCVMP_nnd57nOMU7GY",
+        "EXPO_PUBLIC_GOOGLE_MAPS_MAP_ID": "aab697c91ef02136bf693efd"
       }
     }
   },

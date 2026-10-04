@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "SchoolMate Staff",
-    "slug": "schoolmate-staff",
+    "slug": "staff-app",
     "scheme": "schoolmatestaff",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,7 +9,7 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "config": { "googleMapsApiKey": "" },
+      "config": { "googleMapsApiKey": "AIzaSyCLBnzIqfPTAoo_HnCVMP_nnd57nOMU7GY" },
       "infoPlist": {
         "UIBackgroundModes": ["location"],
         "NSLocationAlwaysAndWhenInUseUsageDescription": "SchoolMate Staff shares the live bus position during a trip.",
@@ -34,7 +34,7 @@
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_LOCATION"
       ],
-      "config": { "googleMaps": { "apiKey": "" } }
+      "config": { "googleMaps": { "apiKey": "AIzaSyCLBnzIqfPTAoo_HnCVMP_nnd57nOMU7GY" } }
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -54,9 +54,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "72049b4a-bb4e-42a1-b485-68fb1fe23932"
+        "projectId": "b19e1153-da8f-4f47-bb3f-2b66da880131"
       }
     },
-    "owner": "catre"
+    "owner": "vaibhavdds-team"
   }
 }
