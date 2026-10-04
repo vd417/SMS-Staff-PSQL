@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/theme';
 import { Btn } from '@/components/ui';
 import { TextScale } from '@/theme/typography';
-import { toMapCoords, type MapCoord } from './toMapCoords';
+import { toMapCoords, isFiniteCoord, type MapCoord } from './toMapCoords';
 import { decodePolyline } from '@/lib/decodePolyline';
 import { BusMarker } from './BusMarker';
 import { StopMarker } from './StopMarker';
@@ -48,10 +48,14 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
     animateCamera: (camera, options) => mapRef.current?.animateCamera(camera, options),
   }), []);
 
-  const coords = toMapCoords(stops);
+  // Drop any stop/live marker with a null/NaN coordinate before it reaches a native
+  // Marker — a non-finite lat/lng is a classic native map-marker crash.
+  const safeStops = stops.filter((s) => isFiniteCoord(s.lat, s.lng));
+  const safeLive = liveMarker && isFiniteCoord(liveMarker.latitude, liveMarker.longitude) ? liveMarker : null;
+  const coords = toMapCoords(safeStops);
   const initial = coords[0] ?? { latitude: 0, longitude: 0 };
-  const roles = stopRoles(stops, liveMarker ?? null);
-  const segments = routeSegments(stops);
+  const roles = stopRoles(safeStops, safeLive);
+  const segments = routeSegments(safeStops);
   const roadPath = routeGeometry?.status === 'available' && routeGeometry.geometry
     ? decodePolyline(routeGeometry.geometry)
     : null;
@@ -89,9 +93,9 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
             <StopMarker role={role} isDestination={isDestination} />
           </Marker>
         ))}
-        {liveMarker && (
-          <Marker testID="map-live-marker" coordinate={liveMarker} anchor={{ x: 0.5, y: 0.5 }}>
-            <BusMarker headingDeg={liveMarker.headingDeg} />
+        {safeLive && (
+          <Marker testID="map-live-marker" coordinate={safeLive} anchor={{ x: 0.5, y: 0.5 }}>
+            <BusMarker headingDeg={safeLive.headingDeg} />
           </Marker>
         )}
       </MapView>
