@@ -1,18 +1,42 @@
 import React, { forwardRef, useImperativeHandle, useRef } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Linking } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/theme';
-import { toMapCoords } from './toMapCoords';
+import { Btn } from '@/components/ui';
+import { TextScale } from '@/theme/typography';
+import { toMapCoords, type MapCoord } from './toMapCoords';
 import { decodePolyline } from '@/lib/decodePolyline';
 import { BusMarker } from './BusMarker';
 import { StopMarker } from './StopMarker';
 import { RouteSegmentLabel } from './RouteSegmentLabel';
 import { RouteUnavailableBadge } from './RouteUnavailableBadge';
+import { MapErrorBoundary } from './MapErrorBoundary';
 import { stopRoles } from './stopRoles';
 import { routeSegments } from './routeSegments';
 import type { LiveMapViewProps, LiveMapHandle } from './liveMapTypes';
 
 export type { LiveMapViewProps, LiveMapHandle };
+
+/** Shown when the map fails to render — keeps the app alive and offers Google Maps. */
+const MapFallback: React.FC<{ retry: () => void; destination?: MapCoord }> = ({ retry, destination }) => {
+  const { t } = useTranslation();
+  const { colors } = useTheme();
+  const openGoogleMaps = () => {
+    const url = destination
+      ? `https://www.google.com/maps/dir/?api=1&destination=${destination.latitude},${destination.longitude}`
+      : 'https://www.google.com/maps';
+    Linking.openURL(url).catch(() => {});
+  };
+  return (
+    <View testID="map-fallback" style={[styles.fallback, { backgroundColor: colors.surface }]}>
+      <Text style={[TextScale.cardTitle, { color: colors.ink, textAlign: 'center' }]}>{t('trip.mapUnavailable')}</Text>
+      <Text style={[TextScale.caption, { color: colors.inkSoft, textAlign: 'center' }]}>{t('trip.mapUnavailableHint')}</Text>
+      <Btn testID="map-open-google" label={t('trip.openInGoogleMaps')} icon="route" onPress={openGoogleMaps} />
+      <Btn testID="map-retry" label={t('trip.retryMap')} variant="ghost" onPress={retry} />
+    </View>
+  );
+};
 
 export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops, liveMarker, onMapReady, routeGeometry, onUserPan }, ref) => {
   const { colors } = useTheme();
@@ -32,8 +56,11 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
     ? decodePolyline(routeGeometry.geometry)
     : null;
 
+  const destination = coords[coords.length - 1];
+
   return (
     <View style={styles.container}>
+      <MapErrorBoundary fallback={(retry) => <MapFallback retry={retry} destination={destination} />}>
       <MapView
         testID="live-map"
         ref={mapRef}
@@ -68,6 +95,7 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
           </Marker>
         )}
       </MapView>
+      </MapErrorBoundary>
       {routeGeometry?.status === 'unavailable' && <RouteUnavailableBadge />}
     </View>
   );
@@ -77,4 +105,5 @@ LiveMapView.displayName = 'LiveMapView';
 const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
+  fallback: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
 });
