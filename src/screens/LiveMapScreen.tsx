@@ -73,6 +73,17 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
     let subscription: { remove: () => void } | null = null;
     let cancelled = false;
 
+    // Some expo-location versions throw inside subscription.remove()
+    // (LocationEventEmitter.removeSubscription is not a function). A teardown
+    // error must never crash the screen, so swallow it.
+    const safeRemove = (sub: { remove: () => void } | null) => {
+      try {
+        sub?.remove();
+      } catch {
+        // ignore: GPS watcher teardown failed; nothing actionable here.
+      }
+    };
+
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (cancelled) return;
@@ -97,7 +108,7 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
           }
         );
         if (cancelled) {
-          sub.remove();
+          safeRemove(sub);
         } else {
           subscription = sub;
         }
@@ -108,7 +119,7 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
 
     return () => {
       cancelled = true;
-      subscription?.remove();
+      safeRemove(subscription);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
