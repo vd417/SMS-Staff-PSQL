@@ -18,6 +18,8 @@ export interface ChatContact {
   role: string;
 }
 
+export type ChatReceiptStatus = 'sent' | 'delivered' | 'read';
+
 export interface ChatMessage {
   id: string;
   text: string;
@@ -25,4 +27,6 @@ export interface ChatMessage {
   /** True when this message was sent by the signed-in staff member. */
   isMine: boolean;
   imageUrl?: string;
+  /** Delivery receipt for the staff member's own messages (WhatsApp-style ticks); undefined for incoming. */
+  status?: ChatReceiptStatus;
 }

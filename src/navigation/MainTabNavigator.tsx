@@ -29,9 +29,9 @@ const TabsNavigator = () => (
     tabBar={(props) => <TabBar {...props} />}
   >
     <Tab.Screen name="Home" component={HomeScreen} />
-    <Tab.Screen name="Inbox" component={MessagesScreen} />
-    <Tab.Screen name="Leave" component={LeaveScreen} />
     <Tab.Screen name="Tasks" component={TasksScreen} />
+    <Tab.Screen name="Leave" component={LeaveScreen} />
+    <Tab.Screen name="Inbox" component={MessagesScreen} />
     <Tab.Screen name="Me" component={ProfileScreen} />
   </Tab.Navigator>
 );

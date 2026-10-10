@@ -127,6 +127,8 @@
   "chat.inputPlaceholder": "संदेश लिखें",
   "chat.send": "भेजें",
   "chat.newChat": "नई चैट",
+  "chat.chats": "चैट",
+  "chat.people": "जिनसे आप संदेश कर सकते हैं",
   "chat.noContacts": "अभी तक कोई संपर्क उपलब्ध नहीं",
   "inbox.title": "इनबॉक्स",
   "inbox.empty": "अभी तक कोई घोषणा नहीं",

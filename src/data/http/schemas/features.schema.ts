@@ -9,6 +9,8 @@ export const chatThreadSchema = z.object({
 export const chatThreadListSchema = z.array(chatThreadSchema);
 export const chatMessageSchema = z.object({
   id: z.string(), text: orEmpty, sent_at: z.string(), is_mine: z.boolean(), image_url: opt(z.string()),
+  delivered_at: opt(z.string()), read_at: opt(z.string()),
+  is_delivered: z.boolean().optional(), is_read: z.boolean().optional(),
 });
 export const chatMessageListSchema = z.array(chatMessageSchema);
 export const chatContactSchema = z.object({ id: z.string(), kind: orEmpty, name: orEmpty, role: orEmpty });

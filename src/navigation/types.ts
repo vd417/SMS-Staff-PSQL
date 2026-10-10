@@ -16,8 +16,8 @@ export type MainStackParamList = {
 
 export type MainTabParamList = {
   Home: undefined;
-  Inbox: undefined;
-  Leave: undefined;
   Tasks: undefined;
+  Leave: undefined;
+  Inbox: undefined;
   Me: undefined;
 };

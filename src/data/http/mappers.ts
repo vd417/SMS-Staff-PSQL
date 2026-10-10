@@ -219,10 +219,22 @@ export interface ChatContactDTO { id: string; kind: string; name: string; role: 
 export const toChatContact = (d: ChatContactDTO): import('@/data/domain').ChatContact =>
   ({ id: d.id, kind: d.kind, name: d.name, role: d.role });
 
-export interface ChatMessageDTO { id: string; text: string; sent_at: string; is_mine: boolean; image_url?: string; }
+export interface ChatMessageDTO {
+  id: string; text: string; sent_at: string; is_mine: boolean; image_url?: string;
+  delivered_at?: string; read_at?: string; is_delivered?: boolean; is_read?: boolean;
+}
+// WhatsApp-style receipt on the sender's own copy only: read > delivered > sent.
+const chatReceiptStatus = (d: ChatMessageDTO): import('@/data/domain').ChatReceiptStatus | undefined => {
+  if (!d.is_mine) return undefined;
+  if (d.is_read || (d.read_at && d.read_at.trim())) return 'read';
+  if (d.is_delivered || (d.delivered_at && d.delivered_at.trim())) return 'delivered';
+  return 'sent';
+};
 export const toChatMessage = (d: ChatMessageDTO): import('@/data/domain').ChatMessage => {
   const m: import('@/data/domain').ChatMessage = { id: d.id, text: d.text, sentAt: d.sent_at, isMine: d.is_mine };
   if (d.image_url !== undefined) m.imageUrl = d.image_url;
+  const status = chatReceiptStatus(d);
+  if (status) m.status = status;
   return m;
 };
 

@@ -127,6 +127,8 @@
   "chat.inputPlaceholder": "Type a message",
   "chat.send": "Send",
   "chat.newChat": "New chat",
+  "chat.chats": "Chats",
+  "chat.people": "People you can message",
   "chat.noContacts": "No contacts available yet",
   "inbox.title": "Inbox",
   "inbox.empty": "No announcements yet",

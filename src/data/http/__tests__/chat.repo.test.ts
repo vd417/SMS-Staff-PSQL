@@ -25,16 +25,20 @@ describe('httpChat', () => {
     expect(threads[1]).toEqual({ id: 't2', name: 'Office', unread: 0 });
   });
 
-  it('maps messages and marks is_mine', async () => {
+  it('maps messages, marks is_mine, and derives the receipt status (ticks)', async () => {
     const { http } = fakeHttp({
       'GET /threads/t1/messages': [
         { id: 'm1', text: 'Hi', sent_at: '2026-10-10T06:00:00Z', is_mine: false, image_url: null },
-        { id: 'm2', text: 'On my way', sent_at: '2026-10-10T06:01:00Z', is_mine: true, image_url: null },
+        { id: 'm2', text: 'On my way', sent_at: '2026-10-10T06:01:00Z', is_mine: true, image_url: null, delivered_at: null, read_at: null },
+        { id: 'm3', text: 'Reaching', sent_at: '2026-10-10T06:02:00Z', is_mine: true, delivered_at: '2026-10-10T06:02:05Z', read_at: null },
+        { id: 'm4', text: 'Done', sent_at: '2026-10-10T06:03:00Z', is_mine: true, read_at: '2026-10-10T06:03:10Z' },
       ],
     });
     const msgs = await httpChat(http).messages('t1');
-    expect(msgs[0]).toEqual({ id: 'm1', text: 'Hi', sentAt: '2026-10-10T06:00:00Z', isMine: false });
-    expect(msgs[1].isMine).toBe(true);
+    expect(msgs[0]).toEqual({ id: 'm1', text: 'Hi', sentAt: '2026-10-10T06:00:00Z', isMine: false }); // no tick for incoming
+    expect(msgs[1].status).toBe('sent');
+    expect(msgs[2].status).toBe('delivered');
+    expect(msgs[3].status).toBe('read');
   });
 
   it('lists management contacts', async () => {
@@ -69,6 +73,6 @@ describe('httpChat', () => {
     });
     const sent = await httpChat(http).send('t1', '  Running late  ');
     expect(calls[0]).toEqual({ method: 'POST', path: '/threads/t1/messages', body: { text: 'Running late', image_url: null } });
-    expect(sent).toEqual({ id: 'm3', text: 'Running late', sentAt: '2026-10-10T06:02:00Z', isMine: true });
+    expect(sent).toEqual({ id: 'm3', text: 'Running late', sentAt: '2026-10-10T06:02:00Z', isMine: true, status: 'sent' });
   });
 });
