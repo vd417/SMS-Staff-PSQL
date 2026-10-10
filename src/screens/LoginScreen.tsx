@@ -1,6 +1,6 @@
 // src/screens/LoginScreen.tsx — production Login screen
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
@@ -167,10 +167,15 @@ export const LoginScreen = () => {
         languageNative={languageNative}
       />
 
+      <KeyboardAvoidingView
+        style={styles.scroll}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.greetingBlock}>
@@ -352,6 +357,7 @@ export const LoginScreen = () => {
           </Text>
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
