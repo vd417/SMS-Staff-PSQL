@@ -46,7 +46,6 @@
         "isAndroidForegroundServiceEnabled": true
       }],
       "expo-secure-store",
-      "react-native-maps",
       ["expo-image-picker", {
         "photosPermission": "SchoolMate Staff uses your photos to attach proof of completed work to a task.",
         "cameraPermission": "SchoolMate Staff uses your camera to attach proof of completed work to a task."
