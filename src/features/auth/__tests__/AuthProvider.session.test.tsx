@@ -27,6 +27,10 @@ jest.mock('@/lib/asyncStore', () => ({
     remove: jest.fn(async (k: string) => { delete mockStore[k]; }),
   },
 }));
+const mockStopBroadcast = jest.fn(() => Promise.resolve());
+jest.mock('@/features/trip/broadcaster', () => ({
+  stopBroadcast: () => mockStopBroadcast(),
+}));
 
 const user = { id: 'u1', name: 'Ramesh', firstName: 'Ramesh', roleKey: 'driver', empId: '', joined: '', rating: 0, dutyPost: '', shift: '', timing: '', phone: '' };
 const stored = { accessToken: 'at-old', refreshToken: 'rt-old', user, tenant: { id: 't1', name: 'School' } };
@@ -75,5 +79,12 @@ describe('AuthProvider session lifecycle', () => {
     act(() => sessionEvents.emitExpired());
     await waitFor(() => expect(r.getByTestId('status').props.children).toBe('unauthenticated'));
     expect(mockTokens.clear).toHaveBeenCalled();
+  });
+
+  it('stops the trip GPS broadcast when the session expires', async () => {
+    const r = renderWith(repos(jest.fn().mockResolvedValue(user)));
+    await waitFor(() => expect(r.getByTestId('status').props.children).toBe('authenticated'));
+    act(() => sessionEvents.emitExpired());
+    await waitFor(() => expect(mockStopBroadcast).toHaveBeenCalled());
   });
 });

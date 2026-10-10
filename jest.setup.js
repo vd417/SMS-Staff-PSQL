@@ -51,6 +51,14 @@ jest.mock('react-native-maps', () => {
   };
 });
 
+// Mock expo-task-manager globally. The trip broadcaster imports it at module load, and the
+// broadcaster is now reached transitively by anything that renders AuthProvider — without this
+// those suites crash on requireNativeModule. Suites that exercise the broadcaster directly
+// declare their own jest.mock('expo-task-manager', ...), which takes precedence.
+jest.mock('expo-task-manager', () => ({
+  defineTask: jest.fn(),
+}));
+
 // Mock AsyncStorage globally so ThemeProvider (used in renderWithTheme) works in all tests.
 jest.mock('@react-native-async-storage/async-storage', () => {
   let mem = {};

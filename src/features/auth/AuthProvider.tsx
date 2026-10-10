@@ -8,6 +8,7 @@ import { authSnapshot } from '@/lib/authSnapshot';
 import { queryClient } from '@/lib/queryClient';
 import { sessionEvents } from '@/lib/sessionEvents';
 import { isAppError } from '@/lib/errors';
+import { stopBroadcast } from '@/features/trip/broadcaster';
 import { useRepositories } from '@/data/repositories/RepositoryContext';
 import { useTheme } from '@/theme';
 
@@ -97,6 +98,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // The refresh token was rejected (revoked / expired after 30 days): drop to Login.
   useEffect(() => sessionEvents.onExpired(() => {
+    // A live trip keeps the native foreground GPS service running; without this it
+    // would keep draining the battery after the session is gone and the user is on Login.
+    void stopBroadcast();
     void tokenStore.clear();
     void asyncStore.remove(SESSION_KEY);
     authSnapshot.clear();
@@ -151,6 +155,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const current = (await tokenStore.read())?.refreshToken ?? session?.refreshToken ?? null;
       await repos.auth.logout(current);
     } finally {
+      // Stop the trip GPS broadcast so logging out never leaves the foreground
+      // location service running (and draining the battery) in the background.
+      await stopBroadcast().catch(() => {});
       await tokenStore.clear();
       await asyncStore.remove(SESSION_KEY);
       authSnapshot.clear();

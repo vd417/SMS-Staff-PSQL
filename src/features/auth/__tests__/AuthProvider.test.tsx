@@ -31,6 +31,10 @@ jest.mock('expo-secure-store', () => {
     deleteItemAsync: jest.fn((k: string) => { delete mem[k]; return Promise.resolve(); }),
   };
 });
+const mockStopBroadcast = jest.fn(() => Promise.resolve());
+jest.mock('@/features/trip/broadcaster', () => ({
+  stopBroadcast: () => mockStopBroadcast(),
+}));
 const AsyncStorage = require('@react-native-async-storage/async-storage').default;
 
 function Harness() {
@@ -105,6 +109,16 @@ describe('AuthProvider', () => {
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('authenticated'));
     fireEvent.press(screen.getByTestId('out'));
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated'));
+  });
+
+  it('signOut stops the trip GPS broadcast', async () => {
+    mockStopBroadcast.mockClear();
+    await renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated'));
+    fireEvent.press(screen.getByTestId('pw-in'));
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('authenticated'));
+    fireEvent.press(screen.getByTestId('out'));
+    await waitFor(() => expect(mockStopBroadcast).toHaveBeenCalled());
   });
 
   it('login applies the session roleKey to the theme, overriding a pre-login role tap', async () => {
