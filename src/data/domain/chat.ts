@@ -9,6 +9,15 @@ export interface ChatThread {
   unread: number;
 }
 
+export interface ChatContact {
+  id: string;
+  /** How the server resolves the recipient — "user" for a management account. */
+  kind: string;
+  name: string;
+  /** Friendly role label, e.g. "Principal" / "School Owner". */
+  role: string;
+}
+
 export interface ChatMessage {
   id: string;
   text: string;

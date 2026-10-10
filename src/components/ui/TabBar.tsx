@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme';
 import { Icon } from '@/components/icons';
 import type { IconName } from '@/components/icons';
-import { useInboxUnread } from '@/features/inbox/hooks';
+import { useChatUnread } from '@/features/chat/hooks';
 import { TextScale } from '@/theme/typography';
 
 export interface TabBarProps {
@@ -17,7 +17,7 @@ export interface TabBarProps {
 // Icon names for the 4 tabs
 const TAB_ICONS: Record<string, IconName> = {
   Home: 'home',
-  Inbox: 'bell',
+  Inbox: 'mail',
   Leave: 'gift',
   Tasks: 'tasks',
   Me: 'user',
@@ -31,7 +31,7 @@ const BAR_RADIUS = 26;
 export const TabBar: React.FC<TabBarProps> = ({ state, navigation, descriptors }) => {
   const { colors, role } = useTheme();
   const insets = useSafeAreaInsets();
-  const inboxUnread = useInboxUnread();
+  const inboxUnread = useChatUnread();
 
   const routes: { key: string; name: string }[] = state.routes;
   const activeIndex: number = state.index;

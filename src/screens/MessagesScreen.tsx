@@ -6,38 +6,71 @@ import { useTheme } from '@/theme';
 import { Card, Btn, Pill, Skeleton, IconBtn } from '@/components/ui';
 import { ErrorState } from '@/components/state';
 import { TextScale } from '@/theme/typography';
-import { useChatThreads, useChatMessages, useSendMessage } from '@/features/chat/hooks';
-import type { ChatThread } from '@/data/domain';
+import { useChatThreads, useChatMessages, useSendMessage, useChatContacts, useCreateThread } from '@/features/chat/hooks';
+import type { ChatThread, ChatContact } from '@/data/domain';
 
 const formatTime = (iso?: string) => (iso ? new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
 
-export interface MessagesScreenProps {
-  navigation: { goBack: () => void };
-}
-
-export const MessagesScreen: React.FC<MessagesScreenProps> = ({ navigation }) => {
+export const MessagesScreen = () => {
   const { t } = useTranslation();
   const { colors, role } = useTheme();
   const insets = useSafeAreaInsets();
   const [active, setActive] = useState<ChatThread | null>(null);
+  const [picking, setPicking] = useState(false);
 
-  const title = active ? active.name : t('chat.title');
-  const onBack = () => (active ? setActive(null) : navigation.goBack());
+  // Inbox tab root = the thread list (no back); a conversation or the new-chat picker shows back.
+  const title = active ? active.name : picking ? t('chat.newChat') : t('inbox.title');
+
+  const openThread = (th: ChatThread) => { setPicking(false); setActive(th); };
 
   return (
     <SafeAreaView testID="messages-screen" style={[styles.fill, { backgroundColor: colors.bg }]}>
       <View style={styles.header}>
-        <IconBtn testID="chat-back" icon="back" label={t('common.back')} onPress={onBack} />
+        {active ? (
+          <IconBtn testID="chat-back" icon="back" label={t('common.back')} onPress={() => setActive(null)} />
+        ) : picking ? (
+          <IconBtn testID="chat-back" icon="back" label={t('common.back')} onPress={() => setPicking(false)} />
+        ) : null}
         <Text style={[TextScale.screenTitle, { color: colors.ink }]} numberOfLines={1}>{title}</Text>
         <View style={styles.headerSpacer} />
+        {!active && !picking ? (
+          <IconBtn testID="chat-new" icon="plus" label={t('chat.newChat')} onPress={() => setPicking(true)} color={role.accent} />
+        ) : null}
       </View>
       {active ? (
         <Conversation thread={active} insets={insets} />
+      ) : picking ? (
+        <ContactsPicker onPicked={openThread} insets={insets} />
       ) : (
         <ThreadList onOpen={setActive} insets={insets} />
       )}
     </SafeAreaView>
   );
+
+  function ContactsPicker({ onPicked }: { onPicked: (t: ChatThread) => void; insets: typeof insets }) {
+    const { data, isLoading, isError, refetch } = useChatContacts();
+    const create = useCreateThread();
+    const pick = (c: ChatContact) => {
+      if (create.isPending) return;
+      create.mutate(c, { onSuccess: onPicked });
+    };
+    return (
+      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 24 }]}>
+        {isLoading ? <Skeleton width="100%" height={64} radius={16} />
+          : isError ? <ErrorState onRetry={refetch} />
+          : data && data.length > 0 ? data.map((c) => (
+            <Pressable key={c.id} testID={`chat-contact-${c.id}`} onPress={() => pick(c)} disabled={create.isPending}>
+              <Card>
+                <Text style={[TextScale.body, { color: colors.ink }]}>{c.name}</Text>
+                {c.role ? <Text style={[TextScale.caption, { color: colors.inkSoft }]}>{c.role}</Text> : null}
+              </Card>
+            </Pressable>
+          )) : (
+            <Text testID="chat-no-contacts" style={[TextScale.caption, { color: colors.inkSoft, marginTop: 8 }]}>{t('chat.noContacts')}</Text>
+          )}
+      </ScrollView>
+    );
+  }
 
   function ThreadList({ onOpen }: { onOpen: (t: ChatThread) => void; insets: typeof insets }) {
     const { data, isLoading, isError, refetch } = useChatThreads();

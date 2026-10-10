@@ -8,7 +8,8 @@ import { RepositoryProvider } from '@/data/repositories/RepositoryContext';
 import { MainTabNavigator } from '@/navigation/MainTabNavigator';
 
 jest.mock('@/screens/HomeScreen', () => ({ HomeScreen: () => null }));
-jest.mock('@/screens/InboxScreen', () => ({ InboxScreen: () => null }));
+jest.mock('@/screens/MessagesScreen', () => ({ MessagesScreen: () => null }));
+jest.mock('@/screens/NotificationsScreen', () => ({ NotificationsScreen: () => null }));
 jest.mock('@/screens/LeaveScreen', () => ({ LeaveScreen: () => null }));
 jest.mock('@/screens/TasksScreen', () => ({ TasksScreen: () => null }));
 jest.mock('@/screens/ProfileScreen', () => ({ ProfileScreen: () => null }));
@@ -16,8 +17,8 @@ jest.mock('@/screens/AttendanceScreen', () => ({ AttendanceScreen: () => null })
 jest.mock('@/screens/TripScreen', () => ({ TripScreen: () => null }));
 jest.mock('@/screens/LiveMapScreen', () => ({ LiveMapScreen: () => null }));
 
-// The custom TabBar reads the inbox unread count, so the navigator needs the query + repo providers.
-const repos = { announcements: { list: async () => [] } } as never;
+// The custom TabBar reads the chat unread count, so the navigator needs the query + repo providers.
+const repos = { chat: { threads: async () => [] } } as never;
 
 describe('MainTabNavigator', () => {
   it('renders without crashing with Home, Inbox, Leave, Tasks, Me registered', () => {

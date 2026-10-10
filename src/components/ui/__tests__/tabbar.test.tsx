@@ -8,8 +8,8 @@ import { RepositoryProvider } from '@/data/repositories/RepositoryContext';
 const state = { index: 0, routes: [{ key: 'Home', name: 'Home' }, { key: 'Leave', name: 'Leave' }, { key: 'Tasks', name: 'Tasks' }, { key: 'Me', name: 'Me' }] };
 const descriptors = Object.fromEntries(state.routes.map(r => [r.key, { options: {} }]));
 
-// TabBar reads the inbox unread count, so it needs the query + repository providers.
-const repos = { announcements: { list: async () => [] } } as never;
+// TabBar reads the chat unread count, so it needs the query + repository providers.
+const repos = { chat: { threads: async () => [] } } as never;
 const withProviders = (ui: React.ReactElement) => (
   <QueryClientProvider client={new QueryClient()}>
     <RepositoryProvider repositories={repos}>{ui}</RepositoryProvider>

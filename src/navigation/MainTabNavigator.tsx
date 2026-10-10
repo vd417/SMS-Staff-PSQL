@@ -5,7 +5,7 @@ import { HomeScreen } from '@/screens/HomeScreen';
 import { LeaveScreen } from '@/screens/LeaveScreen';
 import { TasksScreen } from '@/screens/TasksScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
-import { InboxScreen } from '@/screens/InboxScreen';
+import { NotificationsScreen } from '@/screens/NotificationsScreen';
 import { AttendanceScreen } from '@/screens/AttendanceScreen';
 import { TripScreen } from '@/screens/TripScreen';
 import { IssuesScreen } from '@/screens/IssuesScreen';
@@ -29,7 +29,7 @@ const TabsNavigator = () => (
     tabBar={(props) => <TabBar {...props} />}
   >
     <Tab.Screen name="Home" component={HomeScreen} />
-    <Tab.Screen name="Inbox" component={InboxScreen} />
+    <Tab.Screen name="Inbox" component={MessagesScreen} />
     <Tab.Screen name="Leave" component={LeaveScreen} />
     <Tab.Screen name="Tasks" component={TasksScreen} />
     <Tab.Screen name="Me" component={ProfileScreen} />
@@ -71,8 +71,8 @@ export const MainTabNavigator = () => (
       options={{ presentation: 'card', animation: 'slide_from_right' }}
     />
     <Stack.Screen
-      name="Messages"
-      component={MessagesScreen}
+      name="Notifications"
+      component={NotificationsScreen}
       options={{ presentation: 'card', animation: 'slide_from_right' }}
     />
   </Stack.Navigator>

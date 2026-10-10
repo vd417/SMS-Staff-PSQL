@@ -10,6 +10,7 @@ import { useAuth } from '@/features/auth/AuthProvider';
 import { useDashboard } from '@/features/dashboard/hooks';
 import { useAttendanceStatus } from '@/features/attendance/hooks';
 import { useAttachTaskPhoto } from '@/features/tasks/hooks';
+import { useInboxUnread } from '@/features/inbox/hooks';
 import { useToast } from '@/components/ui';
 import {
   Header,
@@ -32,6 +33,7 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
   const { data: d, isLoading, isError, refetch } = useDashboard();
   const att = useAttendanceStatus();
   const attachTaskPhoto = useAttachTaskPhoto();
+  const notifUnread = useInboxUnread();
   const toast = useToast();
 
   const openAttendance = () => navigation.navigate('Attendance');
@@ -108,6 +110,8 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
           staffName={session.user.name}
           dark={dark}
           onToggleTheme={toggleDark}
+          onPressBell={() => navigation.navigate('Notifications')}
+          notifications={notifUnread}
         />
         <Animated.View entering={FadeInDown.delay(0).duration(300)}>
           <HeroTodayCard

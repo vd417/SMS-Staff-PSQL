@@ -11,6 +11,8 @@ export const chatMessageSchema = z.object({
   id: z.string(), text: orEmpty, sent_at: z.string(), is_mine: z.boolean(), image_url: opt(z.string()),
 });
 export const chatMessageListSchema = z.array(chatMessageSchema);
+export const chatContactSchema = z.object({ id: z.string(), kind: orEmpty, name: orEmpty, role: orEmpty });
+export const chatContactListSchema = z.array(chatContactSchema);
 
 // Announcements (shared /v1/announcements). Staff inbox reads a subset of the CRM fields.
 export const announcementSchema = z.object({

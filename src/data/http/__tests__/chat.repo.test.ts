@@ -37,6 +37,32 @@ describe('httpChat', () => {
     expect(msgs[1].isMine).toBe(true);
   });
 
+  it('lists management contacts', async () => {
+    const { http } = fakeHttp({
+      'GET /threads/contacts': [
+        { id: 'u1', kind: 'user', name: 'Priya Deshmukh', role: 'Principal' },
+        { id: 'u2', kind: 'user', name: 'School Owner', role: 'School Owner' },
+      ],
+    });
+    const contacts = await httpChat(http).contacts();
+    expect(contacts).toEqual([
+      { id: 'u1', kind: 'user', name: 'Priya Deshmukh', role: 'Principal' },
+      { id: 'u2', kind: 'user', name: 'School Owner', role: 'School Owner' },
+    ]);
+  });
+
+  it('creates a thread with a contact (sends contact_kind + contact_id)', async () => {
+    const { http, calls } = fakeHttp({
+      'POST /threads': { id: 'th1', name: 'Priya Deshmukh', role: 'Principal', last_message: null, last_at: null, unread: 0 },
+    });
+    const thread = await httpChat(http).createThread({ id: 'u1', kind: 'user', name: 'Priya Deshmukh', role: 'Principal' });
+    expect(calls[0]).toEqual({
+      method: 'POST', path: '/threads',
+      body: { name: 'Priya Deshmukh', role: 'Principal', group: false, child_id: null, contact_kind: 'user', contact_id: 'u1' },
+    });
+    expect(thread).toEqual({ id: 'th1', name: 'Priya Deshmukh', role: 'Principal', unread: 0 });
+  });
+
   it('sends a trimmed message to the thread and maps the response', async () => {
     const { http, calls } = fakeHttp({
       'POST /threads/t1/messages': { id: 'm3', text: 'Running late', sent_at: '2026-10-10T06:02:00Z', is_mine: true, image_url: null },

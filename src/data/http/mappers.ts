@@ -215,6 +215,10 @@ export const toChatThread = (d: ChatThreadDTO): import('@/data/domain').ChatThre
   if (d.last_at !== undefined) t.lastAt = d.last_at;
   return t;
 };
+export interface ChatContactDTO { id: string; kind: string; name: string; role: string; }
+export const toChatContact = (d: ChatContactDTO): import('@/data/domain').ChatContact =>
+  ({ id: d.id, kind: d.kind, name: d.name, role: d.role });
+
 export interface ChatMessageDTO { id: string; text: string; sent_at: string; is_mine: boolean; image_url?: string; }
 export const toChatMessage = (d: ChatMessageDTO): import('@/data/domain').ChatMessage => {
   const m: import('@/data/domain').ChatMessage = { id: d.id, text: d.text, sentAt: d.sent_at, isMine: d.is_mine };

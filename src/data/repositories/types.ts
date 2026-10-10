@@ -6,7 +6,7 @@ import type {
   Profile,
   Issue, NewIssue,
   VehicleInspection, NewVehicleInspection, FuelLogEntry, NewFuelLogEntry,
-  ChatThread, ChatMessage, Announcement,
+  ChatThread, ChatMessage, ChatContact, Announcement,
 } from '@/data/domain';
 import type { Role } from '@/theme/roles';
 import type { Tokens } from '@/lib/tokenStore';
@@ -80,8 +80,12 @@ export interface VehicleChecksRepository {
 }
 
 export interface ChatRepository {
-  /** Existing threads for the signed-in staff member (reply-first: the office starts the thread). */
+  /** Existing threads for the signed-in staff member. */
   threads(): Promise<ChatThread[]>;
+  /** Management accounts (principal/owner/admin/vice) the staff member can start a chat with. */
+  contacts(): Promise<ChatContact[]>;
+  /** Open (or reuse) a thread with a contact. */
+  createThread(contact: ChatContact): Promise<ChatThread>;
   messages(threadId: string): Promise<ChatMessage[]>;
   send(threadId: string, text: string): Promise<ChatMessage>;
 }

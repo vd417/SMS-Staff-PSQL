@@ -102,8 +102,7 @@ export const ProfileScreen = () => {
           })}
         </Card>
 
-        <Btn testID="my-messages" label={t('chat.title')} variant="ghost" icon="mail" onPress={() => navigation.navigate('Messages' as never)} style={styles.spacer} />
-        <Btn testID="my-attendance" label={t('profile.myAttendance')} variant="ghost" icon="clock" onPress={() => navigation.navigate('Attendance' as never)} />
+        <Btn testID="my-attendance" label={t('profile.myAttendance')} variant="ghost" icon="clock" onPress={() => navigation.navigate('Attendance' as never)} style={styles.spacer} />
         <Btn label={t('profile.applyLeave')} variant="ghost" icon="doc" onPress={() => navigation.navigate('Leave' as never)} />
         <Btn testID="logout" label={t('profile.logout')} accent={colors.danger} onPress={() => logout.mutate()} loading={logout.isPending} />
       </ScrollView>
