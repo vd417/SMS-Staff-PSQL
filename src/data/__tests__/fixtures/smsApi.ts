@@ -226,45 +226,48 @@ export const smsApiFixtures: Record<string, unknown> = {
     }
   ],
   "GET /staff/trips/e4220d66-00b6-460b-a83a-6f5be4ae9956/boarding": [],
-  "GET /staff/trips/e4220d66-00b6-460b-a83a-6f5be4ae9956/stops": {
-    "trip_id": "e4220d66-00b6-460b-a83a-6f5be4ae9956",
-    "current_stop_id": null,
-    "school_arrived_at": null,
-    "stops": [
-      {
-        "stop_id": "a0000000-0000-4000-8000-000000000311",
-        "name": "Sector 14 Market",
-        "seq": 1,
-        "arrived_at": null,
-        "confirmed_at": null,
-        "departed_at": null
-      },
-      {
-        "stop_id": "a0000000-0000-4000-8000-000000000312",
-        "name": "Sector 15 Park",
-        "seq": 2,
-        "arrived_at": null,
-        "confirmed_at": null,
-        "departed_at": null
-      },
-      {
-        "stop_id": "a0000000-0000-4000-8000-000000000313",
-        "name": "Old Railway Road",
-        "seq": 3,
-        "arrived_at": null,
-        "confirmed_at": null,
-        "departed_at": null
-      },
-      {
-        "stop_id": "a0000000-0000-4000-8000-000000000314",
-        "name": "Civil Lines Chowk",
-        "seq": 4,
-        "arrived_at": null,
-        "confirmed_at": null,
-        "departed_at": null
-      }
-    ]
-  },
+  "GET /staff/trips/e4220d66-00b6-460b-a83a-6f5be4ae9956/stops": [
+    {
+      "id": "a0000000-0000-4000-8000-000000000311",
+      "name": "Sector 14 Market",
+      "lat": 28.468,
+      "lng": 77.03,
+      "seq": 1,
+      "status": "pending",
+      "arrived_at": null,
+      "departed_at": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000312",
+      "name": "Sector 15 Park",
+      "lat": 28.4655,
+      "lng": 77.029,
+      "seq": 2,
+      "status": "pending",
+      "arrived_at": null,
+      "departed_at": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000313",
+      "name": "Old Railway Road",
+      "lat": 28.463,
+      "lng": 77.028,
+      "seq": 3,
+      "status": "pending",
+      "arrived_at": null,
+      "departed_at": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000314",
+      "name": "Civil Lines Chowk",
+      "lat": 28.461,
+      "lng": 77.0272,
+      "seq": 4,
+      "status": "pending",
+      "arrived_at": null,
+      "departed_at": null
+    }
+  ],
   "POST /leave": {
     "id": "38676e3f-80f3-4e09-bf27-47bbd4487fc4",
     "tenant_id": "a0000000-0000-4000-8000-000000000001",

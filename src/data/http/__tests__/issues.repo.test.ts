@@ -25,11 +25,16 @@ describe('httpIssues', () => {
     ]);
   });
 
-  it('get fetches a single issue by id and maps its photo_url', async () => {
+  // sms-api's detail endpoint nests the issue under `issue` and adds `notes` — a different shape
+  // from the flat list/create responses.
+  it('get fetches a single issue by id (nested { issue, notes }) and maps its photo_url', async () => {
     const { http, calls } = fakeHttp({
       'GET /staff/issues/i1': {
-        id: 'i1', category: 'safety', title: 'Loose seatbelt', description: 'd', priority: 'high',
-        status: 'open', photo_url: 'data:image/jpeg;base64,abc', created_at: '2026-09-15T08:00:00Z',
+        issue: {
+          id: 'i1', category: 'safety', title: 'Loose seatbelt', description: 'd', priority: 'high',
+          status: 'open', photo_url: 'data:image/jpeg;base64,abc', created_at: '2026-09-15T08:00:00Z',
+        },
+        notes: [],
       },
     });
     const issue = await httpIssues(http).get('i1');

@@ -13,23 +13,37 @@ function fakeHttp(routes: Record<string, unknown>) {
 }
 
 describe('httpTrip stop progress', () => {
-  it('reads GET /staff/trips/{id}/stops', async () => {
+  // sms-api returns a bare, seq-ordered array of stop rows with a server-computed `status`
+  // (completed|current|arrived|pending) and no wrapper object; the trip id comes from the caller.
+  it('maps GET /staff/trips/{id}/stops (server array) to domain TripStops', async () => {
     const { http } = fakeHttp({
-      'GET /staff/trips/t1/stops': {
-        trip_id: 't1', current_stop_id: 's1', school_arrived_at: null,
-        stops: [
-          { stop_id: 's1', name: 'A', seq: 1, arrived_at: '2026-09-26T02:05:00Z', confirmed_at: '2026-09-26T02:05:00Z', departed_at: null },
-          { stop_id: 's2', name: 'B', seq: 2, arrived_at: null, confirmed_at: null, departed_at: null },
-        ],
-      },
+      'GET /staff/trips/t1/stops': [
+        { id: 's1', name: 'A', lat: 1, lng: 2, seq: 1, status: 'current', arrived_at: '2026-09-26T02:05:00Z', departed_at: null },
+        { id: 's2', name: 'B', lat: 3, lng: 4, seq: 2, status: 'completed', arrived_at: '2026-09-26T02:00:00Z', departed_at: '2026-09-26T02:10:00Z' },
+        { id: 's3', name: 'C', lat: 5, lng: 6, seq: 3, status: 'pending', arrived_at: null, departed_at: null },
+      ],
     });
     await expect(httpTrip(http).stops('t1')).resolves.toEqual({
       tripId: 't1', currentStopId: 's1', schoolArrivedAt: null,
       stops: [
-        { stopId: 's1', name: 'A', seq: 1, arrivedAt: '2026-09-26T02:05:00Z', confirmedAt: '2026-09-26T02:05:00Z', departedAt: undefined },
-        { stopId: 's2', name: 'B', seq: 2, arrivedAt: undefined, confirmedAt: undefined, departedAt: undefined },
+        { stopId: 's1', name: 'A', seq: 1, arrivedAt: '2026-09-26T02:05:00Z', departedAt: undefined },
+        { stopId: 's2', name: 'B', seq: 2, arrivedAt: '2026-09-26T02:00:00Z', departedAt: '2026-09-26T02:10:00Z' },
+        { stopId: 's3', name: 'C', seq: 3, arrivedAt: undefined, departedAt: undefined },
       ],
     });
+  });
+
+  // currentStopId is derived from the stop the server flagged `current`; none => null.
+  it('derives currentStopId=null when no stop is current', async () => {
+    const { http } = fakeHttp({
+      'GET /staff/trips/t1/stops': [
+        { id: 's1', name: 'A', lat: 1, lng: 2, seq: 1, status: 'completed', arrived_at: null, departed_at: '2026-09-26T02:10:00Z' },
+        { id: 's2', name: 'B', lat: 3, lng: 4, seq: 2, status: 'pending', arrived_at: null, departed_at: null },
+      ],
+    });
+    const r = await httpTrip(http).stops('t1');
+    expect(r.currentStopId).toBeNull();
+    expect(r.stops.find((s) => s.stopId === 's1')?.departedAt).toBe('2026-09-26T02:10:00Z');
   });
 
   it('posts the three stop actions to the sms-api routes', async () => {

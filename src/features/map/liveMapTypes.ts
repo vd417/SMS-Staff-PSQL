@@ -46,4 +46,6 @@ export interface LiveMapHandle {
   /** Uber/Ola-style camera move (center + bearing + tilt + zoom). On web, tilt/
    *  heading degrade gracefully to a recenter when the wrapper can't apply them. */
   animateCamera: (camera: MapCamera, options?: { duration?: number }) => void;
+  /** Zoom in (+) or out (-) by `delta` levels, where the platform exposes the camera zoom. */
+  zoomBy: (delta: number) => void;
 }

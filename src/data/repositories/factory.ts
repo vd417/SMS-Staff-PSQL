@@ -11,6 +11,8 @@ import { mockLeave } from '@/data/mock/leave.repo';
 import { mockProfile } from '@/data/mock/profile.repo';
 import { mockVehicleChecks } from '@/data/mock/vehicleChecks.repo';
 import { mockRouteGeometry } from '@/data/mock/routeGeometry.repo';
+import { mockChat } from '@/data/mock/chat.repo';
+import { mockAnnouncements } from '@/data/mock/announcements.repo';
 import { httpAuth } from '@/data/http/auth.repo';
 import { httpDashboard } from '@/data/http/dashboard.repo';
 import { httpAttendance } from '@/data/http/attendance.repo';
@@ -21,10 +23,14 @@ import { httpLeave } from '@/data/http/leave.repo';
 import { httpProfile } from '@/data/http/profile.repo';
 import { httpVehicleChecks } from '@/data/http/vehicleChecks.repo';
 import { httpRouteGeometry } from '@/data/http/routeGeometry.repo';
+import { httpChat } from '@/data/http/chat.repo';
+import { httpAnnouncements } from '@/data/http/announcements.repo';
 
 export function createMockRepositories(store: Store): Repositories {
   return {
     auth: mockAuth(store),
+    chat: mockChat(),
+    announcements: mockAnnouncements(),
     dashboard: mockDashboard(store),
     attendance: mockAttendance(store),
     trip: mockTrip(store),
@@ -40,6 +46,8 @@ export function createMockRepositories(store: Store): Repositories {
 export function createHttpRepositories(http: HttpClient): Repositories {
   return {
     auth: httpAuth(http),
+    chat: httpChat(http),
+    announcements: httpAnnouncements(http),
     dashboard: httpDashboard(http),
     attendance: httpAttendance(http),
     trip: httpTrip(http),

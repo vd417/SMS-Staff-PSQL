@@ -164,6 +164,9 @@ const _ICONS = {
   plus: { viewBox: '0 0 24 24', paths: [
     { d: 'M12 5v14M5 12h14' },
   ] },
+  minus: { viewBox: '0 0 24 24', paths: [
+    { d: 'M5 12h14' },
+  ] },
   lock: { viewBox: '0 0 24 24', paths: [
     { d: 'M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Z' },
     { d: 'M7 11V7a5 5 0 0 1 10 0v4' },

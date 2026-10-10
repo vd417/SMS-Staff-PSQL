@@ -4,7 +4,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/theme';
 import { useTripAssignment } from '@/features/trip/hooks';
-import { useSubmitInspection, useSubmitFuelLog } from '@/features/vehicleChecks/hooks';
+import { useSubmitInspection, useSubmitFuelLog, useVehicleInspections, useFuelLogs } from '@/features/vehicleChecks/hooks';
 import { Card, Btn, Pill, Skeleton, IconBtn, useToast } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { ErrorState } from '@/components/state';
@@ -12,6 +12,8 @@ import { TextScale } from '@/theme/typography';
 
 const CHECKLIST_ITEMS = ['brakes', 'tyres', 'lights', 'horn', 'firstAidKit', 'fireExtinguisher', 'emergencyExit', 'fuelLevel'] as const;
 type ChecklistKey = (typeof CHECKLIST_ITEMS)[number];
+
+const formatDate = (iso: string) => new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
 
 export interface VehicleCheckScreenProps {
   navigation: any;
@@ -25,6 +27,8 @@ export const VehicleCheckScreen: React.FC<VehicleCheckScreenProps> = ({ navigati
   const busId = assignment.data?.busId;
   const submitInspection = useSubmitInspection(busId ?? '');
   const submitFuelLog = useSubmitFuelLog(busId ?? '');
+  const inspections = useVehicleInspections(busId ?? '');
+  const fuelLogs = useFuelLogs(busId ?? '');
   const toast = useToast();
 
   const [checklist, setChecklist] = useState<Record<ChecklistKey, boolean>>({
@@ -162,6 +166,57 @@ export const VehicleCheckScreen: React.FC<VehicleCheckScreenProps> = ({ navigati
                 </View>
               ) : null}
             </Card>
+
+            <Card>
+              <Text style={[TextScale.cardTitle, { color: colors.ink }]}>{t('vehicleCheck.inspectionHistory')}</Text>
+              {inspections.isLoading ? (
+                <Skeleton width="100%" height={56} radius={12} style={styles.cta} />
+              ) : inspections.isError ? (
+                <Text style={[TextScale.caption, { color: colors.danger, marginTop: 8 }]}>{t('common.somethingWrong')}</Text>
+              ) : !inspections.data || inspections.data.length === 0 ? (
+                <Text testID="no-inspections" style={[TextScale.caption, { color: colors.inkSoft, marginTop: 8 }]}>
+                  {t('vehicleCheck.noInspections')}
+                </Text>
+              ) : (
+                inspections.data.map((insp) => (
+                  <View key={insp.id} testID={`inspection-row-${insp.id}`} style={[styles.historyRow, { borderColor: colors.sunken }]}>
+                    <View style={styles.historyInfo}>
+                      <Text style={[TextScale.body, { color: colors.ink }]}>{formatDate(insp.inspectionDate)}</Text>
+                      {insp.remarks ? (
+                        <Text style={[TextScale.caption, { color: colors.inkSoft }]} numberOfLines={2}>{insp.remarks}</Text>
+                      ) : null}
+                    </View>
+                    <Pill
+                      label={insp.allOk ? t('vehicleCheck.allClear') : t('vehicleCheck.issuesNoted')}
+                      color={insp.allOk ? colors.success : colors.warn}
+                      bg={insp.allOk ? colors.successSoft : colors.warnSoft}
+                    />
+                  </View>
+                ))
+              )}
+            </Card>
+
+            <Card>
+              <Text style={[TextScale.cardTitle, { color: colors.ink }]}>{t('vehicleCheck.fuelHistory')}</Text>
+              {fuelLogs.isLoading ? (
+                <Skeleton width="100%" height={56} radius={12} style={styles.cta} />
+              ) : fuelLogs.isError ? (
+                <Text style={[TextScale.caption, { color: colors.danger, marginTop: 8 }]}>{t('common.somethingWrong')}</Text>
+              ) : !fuelLogs.data || fuelLogs.data.length === 0 ? (
+                <Text testID="no-fuel-logs" style={[TextScale.caption, { color: colors.inkSoft, marginTop: 8 }]}>
+                  {t('vehicleCheck.noFuelLogs')}
+                </Text>
+              ) : (
+                fuelLogs.data.map((log) => (
+                  <View key={log.id} testID={`fuel-row-${log.id}`} style={[styles.historyRow, { borderColor: colors.sunken }]}>
+                    <View style={styles.historyInfo}>
+                      <Text style={[TextScale.body, { color: colors.ink }]}>{formatDate(log.recordedAt)}</Text>
+                      <Text style={[TextScale.caption, { color: colors.inkSoft }]}>{`${log.odometerKm} km · ${log.fuelAddedLiters} L`}</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </Card>
           </>
         )}
       </ScrollView>
@@ -179,4 +234,6 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1.5, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, marginTop: 10 },
   multiline: { minHeight: 70, textAlignVertical: 'top' },
   cta: { marginTop: 12 },
+  historyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingVertical: 10, borderTopWidth: 1 },
+  historyInfo: { flex: 1, gap: 2 },
 });

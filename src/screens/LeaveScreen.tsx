@@ -84,6 +84,13 @@ export const LeaveScreen = () => {
                 <Card key={r.id}>
                   <Text style={[TextScale.body, { color: colors.ink }]}>{t(`leave.type.${r.type}`)} · {r.fromDate} → {r.toDate}</Text>
                   <Pill label={t(`leave.status.${r.status}`)} color={r.status === 'approved' ? colors.success : r.status === 'rejected' ? colors.danger : colors.warn} bg={colors.surface2} />
+                  {r.status !== 'pending' && (r.decidedByName || r.decidedNote) ? (
+                    <Text testID={`leave-decision-${r.id}`} style={[TextScale.caption, { color: colors.inkSoft, marginTop: 6 }]}>
+                      {r.decidedByName ? t('leave.decidedBy', { name: r.decidedByName }) : ''}
+                      {r.decidedByName && r.decidedNote ? ' · ' : ''}
+                      {r.decidedNote ?? ''}
+                    </Text>
+                  ) : null}
                 </Card>
               ))}
             </>

@@ -40,3 +40,5 @@ yarn-error.*
 
 # superpowers scratch workspaces (SDD ledgers, brainstorm server state/tokens)
 .superpowers/
+
+.claude/settings.local.json

@@ -1,0 +1,19 @@
+export interface ChatThread {
+  id: string;
+  /** The other party's display name (e.g. the principal/admin/owner). */
+  name: string;
+  /** Their role label, when the server provides one. */
+  role?: string;
+  lastMessage?: string;
+  lastAt?: string;
+  unread: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  text: string;
+  sentAt: string;
+  /** True when this message was sent by the signed-in staff member. */
+  isMine: boolean;
+  imageUrl?: string;
+}

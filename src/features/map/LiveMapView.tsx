@@ -1,4 +1,4 @@
-import React, { forwardRef, useImperativeHandle, useRef } from 'react';
+import React, { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, Linking } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +14,8 @@ import { RouteUnavailableBadge } from './RouteUnavailableBadge';
 import { MapErrorBoundary } from './MapErrorBoundary';
 import { stopRoles } from './stopRoles';
 import { routeSegments } from './routeSegments';
+import { splitRouteProgress } from './routeProgress';
+import { useGlidedCoord } from './useGlidedCoord';
 import type { LiveMapViewProps, LiveMapHandle } from './liveMapTypes';
 
 export type { LiveMapViewProps, LiveMapHandle };
@@ -46,6 +48,12 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
     animateToRegion: (region, duration) => mapRef.current?.animateToRegion(region, duration),
     fitToCoordinates: (coordinates, options) => mapRef.current?.fitToCoordinates(coordinates, options),
     animateCamera: (camera, options) => mapRef.current?.animateCamera(camera, options),
+    zoomBy: async (delta) => {
+      const cam = await mapRef.current?.getCamera();
+      if (cam && typeof cam.zoom === 'number') {
+        mapRef.current?.animateCamera({ ...cam, zoom: cam.zoom + delta }, { duration: 200 });
+      }
+    },
   }), []);
 
   // Drop any stop/live marker with a null/NaN coordinate before it reaches a native
@@ -56,9 +64,16 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
   const initial = coords[0] ?? { latitude: 0, longitude: 0 };
   const roles = stopRoles(safeStops, safeLive);
   const segments = routeSegments(safeStops);
-  const roadPath = routeGeometry?.status === 'available' && routeGeometry.geometry
-    ? decodePolyline(routeGeometry.geometry)
-    : null;
+  // Decode once per geometry change, not on every GPS/glide re-render.
+  const roadPath = useMemo(
+    () => (routeGeometry?.status === 'available' && routeGeometry.geometry ? decodePolyline(routeGeometry.geometry) : null),
+    [routeGeometry?.status, routeGeometry?.geometry],
+  );
+  // Uber/Ola-style progress: dim the road already passed, highlight what's ahead. Split at the
+  // point nearest the bus; with no fix the whole route stays "ahead" (highlighted).
+  const route = roadPath && roadPath.length > 1 ? splitRouteProgress(roadPath, safeLive) : null;
+  // Glide the marker between the ~5 s fixes instead of letting it teleport.
+  const glidedLive = useGlidedCoord(safeLive);
 
   const destination = coords[coords.length - 1];
 
@@ -74,8 +89,14 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
         onPanDrag={onUserPan}
         initialRegion={{ ...initial, latitudeDelta: 0.05, longitudeDelta: 0.05 }}
       >
-        {roadPath && roadPath.length > 1 && (
-          <Polyline testID="map-polyline" coordinates={roadPath} strokeWidth={6} strokeColor={colors.primary} />
+        {route && route.ahead.length > 1 && (
+          <Polyline coordinates={route.ahead} strokeWidth={11} strokeColor={colors.surface} lineCap="round" lineJoin="round" />
+        )}
+        {route && route.traveled.length > 1 && (
+          <Polyline testID="map-polyline-traveled" coordinates={route.traveled} strokeWidth={6} strokeColor={colors.inkFaint} lineCap="round" lineJoin="round" />
+        )}
+        {route && route.ahead.length > 1 && (
+          <Polyline testID="map-polyline" coordinates={route.ahead} strokeWidth={7} strokeColor={colors.primary} lineCap="round" lineJoin="round" />
         )}
         {segments.map((seg, i) => (
           <Marker key={`seg-${i}`} testID={`map-segment-${i}`} coordinate={seg.midpoint} anchor={{ x: 0.5, y: 0.5 }}>
@@ -93,9 +114,9 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
             <StopMarker role={role} isDestination={isDestination} />
           </Marker>
         ))}
-        {safeLive && (
-          <Marker testID="map-live-marker" coordinate={safeLive} anchor={{ x: 0.5, y: 0.5 }}>
-            <BusMarker headingDeg={safeLive.headingDeg} />
+        {glidedLive && (
+          <Marker testID="map-live-marker" coordinate={glidedLive} anchor={{ x: 0.5, y: 0.5 }}>
+            <BusMarker headingDeg={glidedLive.headingDeg} />
           </Marker>
         )}
       </MapView>

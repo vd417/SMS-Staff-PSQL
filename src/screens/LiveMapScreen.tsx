@@ -13,7 +13,7 @@ import { useStopProgress } from '@/features/trip/useStopProgress';
 import { stopActionMessage } from '@/features/trip/stopActionMessage';
 import { useResumeBroadcast } from '@/features/trip/useResumeBroadcast';
 import { nextFollowCamera, FOLLOW_DEFAULT_ZOOM, type CameraState } from '@/features/trip/followCamera';
-import type { StopAction } from '@/features/trip/stopProgress';
+import { routeStripFor, type StopAction } from '@/features/trip/stopProgress';
 import { LiveMapView } from '@/features/map/LiveMapView';
 import { toMapCoords } from '@/features/map/toMapCoords';
 import { distanceMeters } from '@/lib/geo';
@@ -244,8 +244,8 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
         )}
       </View>
 
-      <View style={[styles.header, { paddingTop: insets.top + 8, backgroundColor: colors.surface, ...colors.shadow }]}>
-        <View style={styles.headerRow}>
+      <View style={[styles.header, { top: insets.top + 10 }]} pointerEvents="box-none">
+        <View style={[styles.headerCard, { backgroundColor: colors.surface, ...colors.shadowLg }]}>
           <IconBtn icon="back" label={t('common.back')} onPress={() => navigation.goBack()} />
           <View style={styles.headerTitles}>
             <View style={styles.headerTitleRow}>
@@ -269,19 +269,38 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
         </View>
       </View>
 
-      <View
-        style={[
-          styles.recenterBtn,
-          { bottom: bottomCardHeight + insets.bottom + 16, backgroundColor: colors.surface, ...colors.shadow },
-        ]}
-      >
-        <IconBtn testID="recenter-btn" icon="location" label={t('trip.recenter')} onPress={onRecenter} color={colors.primary} />
+      <View style={[styles.controls, { bottom: bottomCardHeight + insets.bottom + 16 }]} pointerEvents="box-none">
+        <View style={[styles.controlBtn, { backgroundColor: colors.surface, ...colors.shadow }]}>
+          <IconBtn testID="zoom-in-btn" icon="plus" label={t('trip.zoomIn')} onPress={() => mapRef.current?.zoomBy?.(1)} color={colors.ink} />
+        </View>
+        <View style={[styles.controlBtn, { backgroundColor: colors.surface, ...colors.shadow }]}>
+          <IconBtn testID="zoom-out-btn" icon="minus" label={t('trip.zoomOut')} onPress={() => mapRef.current?.zoomBy?.(-1)} color={colors.ink} />
+        </View>
+        <View style={[styles.controlBtn, { backgroundColor: colors.surface, ...colors.shadow }]}>
+          <IconBtn
+            testID="recenter-btn"
+            icon="location"
+            label={t('trip.recenter')}
+            onPress={onRecenter}
+            color={followMode ? colors.primary : colors.inkSoft}
+          />
+        </View>
       </View>
 
       <View
-        style={[styles.bottom, { paddingBottom: insets.bottom + 12, backgroundColor: colors.surface, ...colors.shadowLg }]}
+        style={[styles.bottom, { marginBottom: insets.bottom + 10, backgroundColor: colors.surface, ...colors.shadowLg }]}
         onLayout={(e) => setBottomCardHeight(e.nativeEvent.layout.height)}
       >
+        {stops.length > 0 && (
+          <View testID="route-progress-strip" style={[styles.stripTrack, { backgroundColor: colors.sunken }]}>
+            <View
+              style={[
+                styles.stripFill,
+                { width: `${Math.round(routeStripFor(stops, tripStops.data).progress * 100)}%`, backgroundColor: colors.primary },
+              ]}
+            />
+          </View>
+        )}
         {justCompletedStopName && (
           <Text testID="stop-completed-confirm" style={[TextScale.caption, { color: colors.success }]}>
             {t('trip.stopCompletedConfirm', { name: justCompletedStopName })}
@@ -436,27 +455,34 @@ const styles = StyleSheet.create({
   map: { ...StyleSheet.absoluteFillObject },
   header: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 12,
-    paddingBottom: 10,
+    left: 12,
+    right: 12,
   },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 18,
+  },
   headerTitles: { flex: 1 },
   headerTitleRow: { flexDirection: 'row', alignItems: 'baseline' },
-  recenterBtn: { position: 'absolute', right: 16, borderRadius: 100 },
+  controls: { position: 'absolute', right: 14, gap: 10, alignItems: 'center' },
+  controlBtn: { borderRadius: 100 },
   bottom: {
     position: 'absolute',
-    left: 0,
-    right: 0,
+    left: 12,
+    right: 12,
     bottom: 0,
     paddingHorizontal: 16,
     paddingTop: 14,
+    paddingBottom: 16,
     gap: 10,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+    borderRadius: 24,
   },
+  stripTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
+  stripFill: { height: 6, borderRadius: 3 },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 14, flexWrap: 'wrap' },
   nextStopCard: {},
   nextStopHead: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },

@@ -31,4 +31,8 @@ export const queryKeys = {
   profile: (tenantId: string) => ['profile', tenantId] as const,
   vehicleInspections: (busId: string) => ['vehicleChecks', 'inspections', busId] as const,
   fuelLogs: (busId: string) => ['vehicleChecks', 'fuelLogs', busId] as const,
+  chatThreads: () => ['chat', 'threads'] as const,
+  chatMessages: (threadId: string) => ['chat', 'messages', threadId] as const,
+  announcements: () => ['announcements'] as const,
+  inboxLastSeen: () => ['inbox', 'lastSeen'] as const,
 };

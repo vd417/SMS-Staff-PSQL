@@ -41,6 +41,8 @@ export interface TripPing {
   speedKmh: number;
   heading: number;
   at: string; // ISO timestamp
+  /** GPS horizontal accuracy in metres, when the device reports it. */
+  accuracy?: number;
 }
 
 export interface StudentLite {

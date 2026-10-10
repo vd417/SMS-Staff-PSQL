@@ -9,12 +9,20 @@ export interface StopMarkerProps {
   isDestination: boolean;
 }
 
+const shadow = {
+  shadowColor: '#000000',
+  shadowOffset: { width: 0, height: 1 },
+  shadowOpacity: 0.25,
+  shadowRadius: 3,
+  elevation: 3,
+} as const;
+
 export const StopMarker: React.FC<StopMarkerProps> = ({ role, isDestination }) => {
   const { colors } = useTheme();
 
   if (isDestination) {
     return (
-      <View testID="stop-marker-destination" style={[styles.destination, { backgroundColor: colors.gold, borderColor: colors.surface }]}>
+      <View testID="stop-marker-destination" style={[styles.destination, shadow, { backgroundColor: colors.gold, borderColor: colors.surface }]}>
         <Icon name="home" size={16} color="#FFFFFF" strokeWidth={2} />
       </View>
     );
@@ -22,36 +30,44 @@ export const StopMarker: React.FC<StopMarkerProps> = ({ role, isDestination }) =
 
   if (role === 'completed') {
     return (
-      <View testID="stop-marker-completed" style={[styles.small, { backgroundColor: colors.inkFaint, borderColor: colors.surface }]}>
+      <View testID="stop-marker-completed" style={[styles.small, shadow, { backgroundColor: colors.inkFaint, borderColor: colors.surface }]}>
         <Icon name="check" size={10} color="#FFFFFF" strokeWidth={3} />
       </View>
     );
   }
 
   if (role === 'current') {
-    return <View testID="stop-marker-current" style={[styles.large, { backgroundColor: colors.primary, borderColor: colors.surface }]} />;
+    // Pulse ring + solid core so the active stop reads at a glance, Uber-style.
+    return (
+      <View testID="stop-marker-current" style={styles.currentWrap}>
+        <View style={[styles.currentPulse, { backgroundColor: colors.primary }]} />
+        <View style={[styles.large, shadow, { backgroundColor: colors.primary, borderColor: colors.surface }]} />
+      </View>
+    );
   }
 
   if (role === 'next') {
-    return <View testID="stop-marker-next" style={[styles.medium, { backgroundColor: colors.surface, borderColor: colors.primary }]} />;
+    return <View testID="stop-marker-next" style={[styles.medium, shadow, { backgroundColor: colors.surface, borderColor: colors.primary }]} />;
   }
 
-  return <View testID="stop-marker-upcoming" style={[styles.dot, { backgroundColor: colors.inkFaint }]} />;
+  return <View testID="stop-marker-upcoming" style={[styles.dot, shadow, { backgroundColor: colors.surface, borderColor: colors.inkFaint }]} />;
 };
 
 const styles = StyleSheet.create({
   destination: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
+    borderWidth: 2.5,
   },
+  currentWrap: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  currentPulse: { position: 'absolute', width: 36, height: 36, borderRadius: 18, opacity: 0.2 },
   large: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 3,
   },
   medium: {
@@ -61,16 +77,17 @@ const styles = StyleSheet.create({
     borderWidth: 3,
   },
   small: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
+    borderWidth: 2,
   },
   dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
   },
 });

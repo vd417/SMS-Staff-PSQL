@@ -23,6 +23,10 @@ jest.mock('@/features/trip/hooks', () => ({
   useTripAssignment: () => mockAssignment,
 }));
 
+jest.mock('@/features/trip/useRouteGeometry', () => ({
+  useRouteGeometry: () => ({ data: undefined, isLoading: false, isError: false, error: null }),
+}));
+
 jest.mock('@/features/map/LiveMapView', () => {
   const React = require('react');
   const { View, Text } = require('react-native');

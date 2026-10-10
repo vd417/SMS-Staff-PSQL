@@ -11,10 +11,12 @@ export type MainStackParamList = {
   VehicleCheck: undefined;
   LiveMap: { tripId: string };
   RoutePreview: undefined;
+  Messages: undefined;
 };
 
 export type MainTabParamList = {
   Home: undefined;
+  Inbox: undefined;
   Leave: undefined;
   Tasks: undefined;
   Me: undefined;

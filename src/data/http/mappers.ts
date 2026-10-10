@@ -180,18 +180,47 @@ export const toTripAssignment = (d: TripAssignmentDTO): TripAssignment => ({
   conductorName: d.conductor_name ?? null, shift: d.shift ?? undefined, studentsAssigned: d.students_assigned,
 });
 
-export interface TripStopsDTO {
-  trip_id: string; current_stop_id: string | null; school_arrived_at: string | null;
-  stops: Array<{ stop_id: string; name: string; seq: number; arrived_at?: string; confirmed_at?: string; departed_at?: string }>;
+export interface TripStopWireDTO {
+  id: string; name: string; lat: number; lng: number; seq: number;
+  status: 'completed' | 'current' | 'arrived' | 'pending';
+  arrived_at?: string; departed_at?: string;
 }
-export const toTripStops = (d: TripStopsDTO): TripStops => ({
-  tripId: d.trip_id,
-  currentStopId: d.current_stop_id,
-  schoolArrivedAt: d.school_arrived_at,
-  stops: d.stops.map((s) => ({
-    stopId: s.stop_id, name: s.name, seq: s.seq, arrivedAt: s.arrived_at, confirmedAt: s.confirmed_at, departedAt: s.departed_at,
+// sms-api returns a bare seq-ordered array with a server-computed `status`; the trip id comes
+// from the caller. currentStopId is the stop the server flagged `current`. School arrival is a
+// separate concern (the trip's own status), not carried on this endpoint, so it stays null here.
+export const toTripStops = (tripId: string, rows: TripStopWireDTO[]): TripStops => ({
+  tripId,
+  currentStopId: rows.find((s) => s.status === 'current')?.id ?? null,
+  schoolArrivedAt: null,
+  stops: rows.map((s) => ({
+    stopId: s.id, name: s.name, seq: s.seq, arrivedAt: s.arrived_at, departedAt: s.departed_at,
   })),
 });
+
+export interface AnnouncementDTO { id: string; title: string; body?: string; date: string; from?: string; type?: string; audience?: string; pinned: boolean; }
+export const toAnnouncement = (d: AnnouncementDTO): import('@/data/domain').Announcement => {
+  const a: import('@/data/domain').Announcement = { id: d.id, title: d.title, date: d.date, pinned: d.pinned };
+  if (d.body !== undefined) a.body = d.body;
+  if (d.from !== undefined) a.from = d.from;
+  if (d.type !== undefined) a.type = d.type;
+  if (d.audience !== undefined) a.audience = d.audience;
+  return a;
+};
+
+export interface ChatThreadDTO { id: string; name: string; role?: string; last_message?: string; last_at?: string; unread: number; }
+export const toChatThread = (d: ChatThreadDTO): import('@/data/domain').ChatThread => {
+  const t: import('@/data/domain').ChatThread = { id: d.id, name: d.name, unread: d.unread };
+  if (d.role !== undefined) t.role = d.role;
+  if (d.last_message !== undefined) t.lastMessage = d.last_message;
+  if (d.last_at !== undefined) t.lastAt = d.last_at;
+  return t;
+};
+export interface ChatMessageDTO { id: string; text: string; sent_at: string; is_mine: boolean; image_url?: string; }
+export const toChatMessage = (d: ChatMessageDTO): import('@/data/domain').ChatMessage => {
+  const m: import('@/data/domain').ChatMessage = { id: d.id, text: d.text, sentAt: d.sent_at, isMine: d.is_mine };
+  if (d.image_url !== undefined) m.imageUrl = d.image_url;
+  return m;
+};
 
 export interface TaskDTO { id: string; title: string; detail?: string; priority: 'urgent' | 'normal'; done: boolean; due_label?: string; photo_url?: string; remarks?: string; }
 export function toTask(d: TaskDTO): Task {
@@ -261,15 +290,24 @@ export interface LeaveRequestWireDTO {
   to_date: string | null;
   reason: string | null;
   status: LeaveRequest['status'];
+  decided_by_name?: string | null;
+  decided_note?: string | null;
 }
-export const toLeaveRequestFromWire = (d: LeaveRequestWireDTO): LeaveRequest => ({
-  id: d.id,
-  type: d.type as LeaveRequest['type'],
-  fromDate: d.from_date ?? '',
-  toDate: d.to_date ?? '',
-  reason: d.reason ?? '',
-  status: d.status,
-});
+export const toLeaveRequestFromWire = (d: LeaveRequestWireDTO): LeaveRequest => {
+  const r: LeaveRequest = {
+    id: d.id,
+    type: d.type as LeaveRequest['type'],
+    fromDate: d.from_date ?? '',
+    toDate: d.to_date ?? '',
+    reason: d.reason ?? '',
+    status: d.status,
+  };
+  // Only present once a manager has approved/rejected — kept off the object otherwise so the
+  // shape matches the mock adapter (contract parity) and nothing renders for pending requests.
+  if (d.decided_by_name != null) r.decidedByName = d.decided_by_name;
+  if (d.decided_note != null) r.decidedNote = d.decided_note;
+  return r;
+};
 
 export interface StaffDocumentDTO { id: string; label: string; value: string; ok?: boolean; }
 export interface ProfileDTO {

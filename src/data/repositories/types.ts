@@ -6,6 +6,7 @@ import type {
   Profile,
   Issue, NewIssue,
   VehicleInspection, NewVehicleInspection, FuelLogEntry, NewFuelLogEntry,
+  ChatThread, ChatMessage, Announcement,
 } from '@/data/domain';
 import type { Role } from '@/theme/roles';
 import type { Tokens } from '@/lib/tokenStore';
@@ -78,8 +79,22 @@ export interface VehicleChecksRepository {
   submitFuelLog(req: NewFuelLogEntry): Promise<FuelLogEntry>;
 }
 
+export interface ChatRepository {
+  /** Existing threads for the signed-in staff member (reply-first: the office starts the thread). */
+  threads(): Promise<ChatThread[]>;
+  messages(threadId: string): Promise<ChatMessage[]>;
+  send(threadId: string, text: string): Promise<ChatMessage>;
+}
+
+export interface AnnouncementsRepository {
+  /** School announcements visible to this staff member (the hook filters out academic ones). */
+  list(): Promise<Announcement[]>;
+}
+
 export interface Repositories {
   auth: AuthRepository;
+  chat: ChatRepository;
+  announcements: AnnouncementsRepository;
   dashboard: DashboardRepository;
   attendance: AttendanceRepository;
   trip: TripRepository;

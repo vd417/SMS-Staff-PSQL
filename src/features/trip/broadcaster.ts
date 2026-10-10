@@ -32,6 +32,7 @@ TaskManager.defineTask(TRIP_LOCATION_TASK, async ({ data, error }) => {
       speedKmh: Math.max(0, Math.round((loc.coords.speed ?? 0) * 3.6)),
       heading: loc.coords.heading ?? 0,
       at: new Date(loc.timestamp).toISOString(),
+      accuracy: loc.coords.accuracy ?? undefined,
     };
     try { await publish(ping); } catch { /* offline — buffer retries on next event */ }
   }
@@ -76,6 +77,7 @@ function publishFromLocation(loc: Location.LocationObject): void {
     speedKmh: Math.max(0, Math.round((loc.coords.speed ?? 0) * 3.6)),
     heading: loc.coords.heading ?? 0,
     at: new Date(loc.timestamp).toISOString(),
+    accuracy: loc.coords.accuracy ?? undefined,
   };
   publish(ping).catch(() => { /* offline — buffer retries on next event */ });
 }

@@ -1,9 +1,9 @@
-import React, { forwardRef, useImperativeHandle, useRef } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, Polyline } from '@teovilla/react-native-web-maps';
 import type RNMapView from 'react-native-maps';
 import { useTheme } from '@/theme';
-import { toMapCoords } from './toMapCoords';
+import { toMapCoords, isFiniteCoord } from './toMapCoords';
 import { decodePolyline } from '@/lib/decodePolyline';
 import { BusMarker } from './BusMarker';
 import { StopMarker } from './StopMarker';
@@ -11,6 +11,8 @@ import { RouteSegmentLabel } from './RouteSegmentLabel';
 import { RouteUnavailableBadge } from './RouteUnavailableBadge';
 import { stopRoles } from './stopRoles';
 import { routeSegments } from './routeSegments';
+import { splitRouteProgress } from './routeProgress';
+import { useGlidedCoord } from './useGlidedCoord';
 import type { LiveMapViewProps, LiveMapHandle } from './liveMapTypes';
 
 export type { LiveMapViewProps, LiveMapHandle };
@@ -22,6 +24,7 @@ const zoomToDelta = (zoom: number | undefined): number => 360 / Math.pow(2, zoom
 export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops, liveMarker, onMapReady, routeGeometry, onUserPan }, ref) => {
   const { colors } = useTheme();
   const mapRef = useRef<Partial<RNMapView>>(null);
+  const containerRef = useRef<unknown>(null);
   const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
   // Optional Cloud-based Map ID (enables vector maps / cloud styling). Undefined
   // is fine — the map falls back to the default raster style.
@@ -44,15 +47,44 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
         options?.duration ?? 500,
       );
     },
+    zoomBy: async (delta) => {
+      const map = mapRef.current as { getCamera?: () => Promise<{ zoom?: number }>; animateCamera?: (c: unknown, o?: unknown) => void } | null;
+      try {
+        const cam = await map?.getCamera?.();
+        if (cam && typeof cam.zoom === 'number') {
+          map?.animateCamera?.({ ...cam, zoom: cam.zoom + delta }, { duration: 200 });
+        }
+      } catch {
+        // Zoom not supported by this web map wrapper — the built-in Google +/- controls remain.
+      }
+    },
   }), []);
 
-  const coords = toMapCoords(stops);
+  // A null/NaN coordinate flows straight into the DOM overlay position on web (no native guard),
+  // so filter at this boundary exactly like the native view does.
+  const safeStops = stops.filter((s) => isFiniteCoord(s.lat, s.lng));
+  const safeLive = liveMarker && isFiniteCoord(liveMarker.latitude, liveMarker.longitude) ? liveMarker : null;
+  const coords = toMapCoords(safeStops);
   const initial = coords[0] ?? { latitude: 0, longitude: 0 };
-  const roles = stopRoles(stops, liveMarker ?? null);
-  const segments = routeSegments(stops);
-  const roadPath = routeGeometry?.status === 'available' && routeGeometry.geometry
-    ? decodePolyline(routeGeometry.geometry)
-    : null;
+  const roles = stopRoles(safeStops, safeLive);
+  const segments = routeSegments(safeStops);
+  const roadPath = useMemo(
+    () => (routeGeometry?.status === 'available' && routeGeometry.geometry ? decodePolyline(routeGeometry.geometry) : null),
+    [routeGeometry?.status, routeGeometry?.geometry],
+  );
+  const route = roadPath && roadPath.length > 1 ? splitRouteProgress(roadPath, safeLive) : null;
+  const glidedLive = useGlidedCoord(safeLive);
+
+  // teovilla only forwards onPanDrag for map DRAG, so a scroll-wheel zoom wouldn't drop follow
+  // mode and the next fix would snap the zoom back. Listen for wheel on the container (web only;
+  // the ref is a DOM node there, and a no-op elsewhere) to suspend following on manual zoom.
+  useEffect(() => {
+    const node = containerRef.current as { addEventListener?: Function; removeEventListener?: Function } | null;
+    if (!node || typeof node.addEventListener !== 'function' || !onUserPan) return;
+    const handler = () => onUserPan();
+    node.addEventListener('wheel', handler, { passive: true });
+    return () => node.removeEventListener?.('wheel', handler);
+  }, [onUserPan]);
 
   if (!apiKey) {
     return (
@@ -63,7 +95,7 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
   }
 
   return (
-    <View style={styles.container}>
+    <View ref={containerRef as never} style={styles.container}>
       <MapView
         testID="live-map"
         ref={mapRef}
@@ -75,8 +107,14 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
         onPanDrag={onUserPan}
         initialRegion={{ ...initial, latitudeDelta: 0.05, longitudeDelta: 0.05 }}
       >
-        {roadPath && roadPath.length > 1 && (
-          <Polyline testID="map-polyline" coordinates={roadPath} strokeWidth={6} strokeColor={colors.primary} />
+        {route && route.ahead.length > 1 && (
+          <Polyline coordinates={route.ahead} strokeWidth={11} strokeColor={colors.surface} />
+        )}
+        {route && route.traveled.length > 1 && (
+          <Polyline testID="map-polyline-traveled" coordinates={route.traveled} strokeWidth={6} strokeColor={colors.inkFaint} />
+        )}
+        {route && route.ahead.length > 1 && (
+          <Polyline testID="map-polyline" coordinates={route.ahead} strokeWidth={7} strokeColor={colors.primary} />
         )}
         {segments.map((seg, i) => (
           <Marker key={`seg-${i}`} testID={`map-segment-${i}`} coordinate={seg.midpoint}>
@@ -88,9 +126,9 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
             <StopMarker role={role} isDestination={isDestination} />
           </Marker>
         ))}
-        {liveMarker && (
-          <Marker testID="map-live-marker" coordinate={liveMarker}>
-            <BusMarker headingDeg={liveMarker.headingDeg} />
+        {glidedLive && (
+          <Marker testID="map-live-marker" coordinate={glidedLive}>
+            <BusMarker headingDeg={glidedLive.headingDeg} />
           </Marker>
         )}
       </MapView>

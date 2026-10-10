@@ -5,12 +5,14 @@ import { HomeScreen } from '@/screens/HomeScreen';
 import { LeaveScreen } from '@/screens/LeaveScreen';
 import { TasksScreen } from '@/screens/TasksScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
+import { InboxScreen } from '@/screens/InboxScreen';
 import { AttendanceScreen } from '@/screens/AttendanceScreen';
 import { TripScreen } from '@/screens/TripScreen';
 import { IssuesScreen } from '@/screens/IssuesScreen';
 import { VehicleCheckScreen } from '@/screens/VehicleCheckScreen';
 import { LiveMapScreen } from '@/screens/LiveMapScreen';
 import { RoutePreviewScreen } from '@/screens/RoutePreviewScreen';
+import { MessagesScreen } from '@/screens/MessagesScreen';
 import { TabBar } from '@/components/ui';
 import type { MainStackParamList, MainTabParamList } from './types';
 
@@ -27,6 +29,7 @@ const TabsNavigator = () => (
     tabBar={(props) => <TabBar {...props} />}
   >
     <Tab.Screen name="Home" component={HomeScreen} />
+    <Tab.Screen name="Inbox" component={InboxScreen} />
     <Tab.Screen name="Leave" component={LeaveScreen} />
     <Tab.Screen name="Tasks" component={TasksScreen} />
     <Tab.Screen name="Me" component={ProfileScreen} />
@@ -65,6 +68,11 @@ export const MainTabNavigator = () => (
     <Stack.Screen
       name="RoutePreview"
       component={RoutePreviewScreen}
+      options={{ presentation: 'card', animation: 'slide_from_right' }}
+    />
+    <Stack.Screen
+      name="Messages"
+      component={MessagesScreen}
       options={{ presentation: 'card', animation: 'slide_from_right' }}
     />
   </Stack.Navigator>

@@ -1,10 +1,12 @@
 // src/components/ui/TabBar.tsx
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme';
 import { Icon } from '@/components/icons';
 import type { IconName } from '@/components/icons';
+import { useInboxUnread } from '@/features/inbox/hooks';
+import { TextScale } from '@/theme/typography';
 
 export interface TabBarProps {
   state: any;
@@ -15,6 +17,7 @@ export interface TabBarProps {
 // Icon names for the 4 tabs
 const TAB_ICONS: Record<string, IconName> = {
   Home: 'home',
+  Inbox: 'bell',
   Leave: 'gift',
   Tasks: 'tasks',
   Me: 'user',
@@ -28,6 +31,7 @@ const BAR_RADIUS = 26;
 export const TabBar: React.FC<TabBarProps> = ({ state, navigation, descriptors }) => {
   const { colors, role } = useTheme();
   const insets = useSafeAreaInsets();
+  const inboxUnread = useInboxUnread();
 
   const routes: { key: string; name: string }[] = state.routes;
   const activeIndex: number = state.index;
@@ -59,12 +63,19 @@ export const TabBar: React.FC<TabBarProps> = ({ state, navigation, descriptors }
         accessibilityState={{ selected: isFocused }}
         accessibilityLabel={label}
       >
-        <Icon
-          name={iconName}
-          size={24}
-          color={iconColor}
-          strokeWidth={isFocused ? 2.5 : 2}
-        />
+        <View>
+          <Icon
+            name={iconName}
+            size={24}
+            color={iconColor}
+            strokeWidth={isFocused ? 2.5 : 2}
+          />
+          {route.name === 'Inbox' && inboxUnread > 0 ? (
+            <View testID="inbox-badge" style={[styles.badge, { backgroundColor: colors.danger, borderColor: colors.surface }]}>
+              <Text style={[TextScale.caption, styles.badgeText]}>{inboxUnread > 9 ? '9+' : String(inboxUnread)}</Text>
+            </View>
+          ) : null}
+        </View>
       </Pressable>
     );
   };
@@ -130,4 +141,17 @@ const styles = StyleSheet.create({
     height: BAR_HEIGHT,
     minWidth: 44,
   },
+  badge: {
+    position: 'absolute',
+    top: -6,
+    right: -10,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    paddingHorizontal: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: { color: '#FFFFFF', fontSize: 9, lineHeight: 12, fontWeight: '700' },
 });

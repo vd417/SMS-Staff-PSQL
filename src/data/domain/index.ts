@@ -10,3 +10,5 @@ export * from './leave';
 export * from './profile';
 export * from './issue';
 export * from './vehicleCheck';
+export * from './chat';
+export * from './announcement';

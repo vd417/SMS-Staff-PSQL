@@ -17,7 +17,7 @@ export function httpTrip(http: HttpClient): TripRepository {
     publishPings: (tripId: string, pings: TripPing[]) =>
       http
         .post<void>(`/staff/trips/${tripId}/pings`, {
-          pings: pings.map((p) => ({ lat: p.lat, lng: p.lng, speed_kmh: p.speedKmh, heading: p.heading, at: p.at })),
+          pings: pings.map((p) => ({ lat: p.lat, lng: p.lng, speed_kmh: p.speedKmh, heading: p.heading, at: p.at, accuracy: p.accuracy })),
         })
         .then(() => undefined),
     endTrip: (tripId: string) =>
@@ -34,7 +34,7 @@ export function httpTrip(http: HttpClient): TripRepository {
     boardingState: (tripId: string) =>
       http.get(`/staff/trips/${tripId}/boarding`).then((d) => parseWire(boardingListSchema, d, 'boarding').map(toBoarding)),
     stops: (tripId: string) =>
-      http.get(`/staff/trips/${tripId}/stops`).then((d) => toTripStops(parseWire(tripStopsSchema, d, 'trip stops'))),
+      http.get(`/staff/trips/${tripId}/stops`).then((d) => toTripStops(tripId, parseWire(tripStopsSchema, d, 'trip stops'))),
     confirmArrival: (tripId: string, stopId: string) =>
       http.post<void>(`/staff/trips/${tripId}/stops/${stopId}/confirm-arrival`).then(() => undefined),
     departStop: (tripId: string, stopId: string) =>

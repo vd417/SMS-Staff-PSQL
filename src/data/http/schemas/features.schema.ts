@@ -1,5 +1,23 @@
 import { z } from 'zod';
-import { opt } from './wire';
+import { opt, orEmpty } from './wire';
+
+// Chat (shared /v1/threads engine). Staff only read + reply, so we keep the minimal fields.
+export const chatThreadSchema = z.object({
+  id: z.string(), name: orEmpty, role: opt(z.string()),
+  last_message: opt(z.string()), last_at: opt(z.string()), unread: z.number(),
+});
+export const chatThreadListSchema = z.array(chatThreadSchema);
+export const chatMessageSchema = z.object({
+  id: z.string(), text: orEmpty, sent_at: z.string(), is_mine: z.boolean(), image_url: opt(z.string()),
+});
+export const chatMessageListSchema = z.array(chatMessageSchema);
+
+// Announcements (shared /v1/announcements). Staff inbox reads a subset of the CRM fields.
+export const announcementSchema = z.object({
+  id: z.string(), title: orEmpty, body: opt(z.string()), date: z.string(),
+  from: opt(z.string()), type: opt(z.string()), audience: opt(z.string()), pinned: z.boolean().nullish().transform((v) => v ?? false),
+});
+export const announcementListSchema = z.array(announcementSchema);
 
 export const taskSchema = z.object({
   id: z.string(), title: z.string(), detail: opt(z.string()), priority: z.enum(['urgent', 'normal']),
@@ -12,12 +30,16 @@ export const issueSchema = z.object({
   vehicle_id: opt(z.string()), route_id: opt(z.string()), trip_id: opt(z.string()), photo_url: opt(z.string()), created_at: z.string(),
 });
 export const issueListSchema = z.array(issueSchema);
+// sms-api's GET /staff/issues/{id} nests the issue under `issue` and adds a `notes` array
+// (unlike the flat list/create responses). We only need the issue itself for now.
+export const issueDetailSchema = z.object({ issue: issueSchema });
 
 const leaveType = z.enum(['casual', 'sick', 'earned', 'medical', 'maternity', 'emergency', 'other']);
 export const leaveBalancesSchema = z.array(z.object({ type: leaveType, total: z.number(), used: z.number() }));
 export const leaveRequestSchema = z.object({
   id: z.string(), type: leaveType, from_date: z.string().nullable(), to_date: z.string().nullable(),
   reason: z.string().nullable(), status: z.enum(['pending', 'approved', 'rejected']),
+  decided_by_name: z.string().nullish(), decided_note: z.string().nullish(),
 });
 export const leaveListSchema = z.array(leaveRequestSchema);
 

@@ -16,9 +16,24 @@ const mockSubmitInspection = jest.fn(async (req: unknown) => ({
 const mockSubmitFuelLog = jest.fn(async (req: unknown) => ({
   id: 'fuel_1', recordedAt: '2026-09-16T06:05:00Z', ...(req as object),
 }));
+const mockInspections = {
+  data: [
+    { id: 'insp_1', busId: 'bus_1', allOk: true, inspectionDate: '2026-09-16', createdAt: '2026-09-16T06:00:00Z' },
+    { id: 'insp_2', busId: 'bus_1', allOk: false, inspectionDate: '2026-09-10', createdAt: '2026-09-10T06:00:00Z', remarks: 'Brake soft' },
+  ] as any[],
+  isLoading: false,
+  isError: false,
+};
+const mockFuelLogs = {
+  data: [{ id: 'fuel_1', busId: 'bus_1', odometerKm: 45210, fuelAddedLiters: 30, recordedAt: '2026-09-16T06:05:00Z' }] as any[],
+  isLoading: false,
+  isError: false,
+};
 jest.mock('@/features/vehicleChecks/hooks', () => ({
   useSubmitInspection: () => ({ mutateAsync: mockSubmitInspection, isPending: false }),
   useSubmitFuelLog: () => ({ mutateAsync: mockSubmitFuelLog, isPending: false }),
+  useVehicleInspections: () => mockInspections,
+  useFuelLogs: () => mockFuelLogs,
 }));
 
 const mockNavigation = { goBack: jest.fn(), navigate: jest.fn() } as any;
@@ -85,6 +100,34 @@ it('shows a validation message and does not save an invalid fuel log', async () 
   fireEvent.press(getByTestId('fuel-log-save'));
   await waitFor(() => expect(getByText('Please enter valid odometer and fuel values')).toBeTruthy());
   expect(mockSubmitFuelLog).not.toHaveBeenCalled();
+});
+
+it('shows inspection history with status and fuel history from the existing endpoints', async () => {
+  const { findByTestId, getByText } = renderScreen();
+  expect(await findByTestId('inspection-row-insp_1')).toBeTruthy();
+  expect(await findByTestId('inspection-row-insp_2')).toBeTruthy();
+  expect(await findByTestId('fuel-row-fuel_1')).toBeTruthy();
+  // allOk → "All clear"; !allOk → "Issues noted"; remarks shown
+  expect(getByText('All clear')).toBeTruthy();
+  expect(getByText('Issues noted')).toBeTruthy();
+  expect(getByText('Brake soft')).toBeTruthy();
+  expect(getByText('45210 km · 30 L')).toBeTruthy();
+});
+
+it('shows empty states when there is no vehicle-check or fuel history', async () => {
+  mockInspections.data = [];
+  mockFuelLogs.data = [];
+  try {
+    const { findByTestId } = renderScreen();
+    expect(await findByTestId('no-inspections')).toBeTruthy();
+    expect(await findByTestId('no-fuel-logs')).toBeTruthy();
+  } finally {
+    mockInspections.data = [
+      { id: 'insp_1', busId: 'bus_1', allOk: true, inspectionDate: '2026-09-16', createdAt: '2026-09-16T06:00:00Z' },
+      { id: 'insp_2', busId: 'bus_1', allOk: false, inspectionDate: '2026-09-10', createdAt: '2026-09-10T06:00:00Z', remarks: 'Brake soft' },
+    ];
+    mockFuelLogs.data = [{ id: 'fuel_1', busId: 'bus_1', odometerKm: 45210, fuelAddedLiters: 30, recordedAt: '2026-09-16T06:05:00Z' }];
+  }
 });
 
 it('navigates back when the back button is pressed', async () => {

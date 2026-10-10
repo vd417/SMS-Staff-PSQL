@@ -38,12 +38,11 @@ export const boardingListSchema = z.array(z.object({
   trip_id: z.string(), student_id: z.string(), stop_id: orEmpty, state: z.enum(['boarded', 'dropped', 'absent']), at: z.string(),
 }));
 
-export const tripStopsSchema = z.object({
-  trip_id: z.string(),
-  current_stop_id: z.string().nullish().transform((v) => v ?? null),
-  school_arrived_at: z.string().nullish().transform((v) => v ?? null),
-  stops: z.array(z.object({
-    stop_id: z.string(), name: z.string(), seq: z.number(),
-    arrived_at: opt(z.string()), confirmed_at: opt(z.string()), departed_at: opt(z.string()),
-  })),
-});
+// sms-api's GET /staff/trips/{id}/stops returns a bare, seq-ordered array of RouteStops joined
+// with per-trip progress, each row carrying a server-computed `status`. There is no wrapper
+// object: the trip id is known by the caller and school arrival is not surfaced here.
+export const tripStopsSchema = z.array(z.object({
+  id: z.string(), name: z.string(), lat: z.number(), lng: z.number(), seq: z.number(),
+  status: z.enum(['completed', 'current', 'arrived', 'pending']),
+  arrived_at: opt(z.string()), departed_at: opt(z.string()),
+}));
