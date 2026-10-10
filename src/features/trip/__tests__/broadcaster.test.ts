@@ -129,3 +129,56 @@ describe('stopBroadcast', () => {
     expect(mockRemove).toHaveBeenCalled();
   });
 });
+
+describe('trip ended server-side', () => {
+  async function until(cond: () => boolean, ms = 2000): Promise<void> {
+    const start = Date.now();
+    while (!cond()) {
+      if (Date.now() - start > ms) throw new Error('condition not met in time');
+      await new Promise((r) => setTimeout(r, 5));
+    }
+  }
+  const sample = (lat: number, lng: number, at: number) => ({
+    coords: { latitude: lat, longitude: lng, speed: 5, heading: 90 },
+    timestamp: at,
+  });
+
+  it('stops GPS when a ping for the active trip is rejected with trip_ended', async () => {
+    const onPings = jest.fn().mockRejectedValue(new AppError('trip_ended', 409, 'ended'));
+    await startBroadcast({ tripId: 't1', onPings });
+    expect(isBroadcasting()).toBe(true);
+    const cb = mockWatchPositionAsync.mock.calls[0][1] as (loc: unknown) => void;
+    cb(sample(12.9, 77.6, Date.now()));
+    await until(() => !isBroadcasting());
+    expect(mockRemove).toHaveBeenCalled();
+    await expect(getPersistedBroadcastTripId()).resolves.toBeNull();
+  });
+
+  it('sends no further pings after the active trip ends server-side', async () => {
+    const onPings = jest.fn().mockRejectedValue(new AppError('trip_ended', 409, 'ended'));
+    await startBroadcast({ tripId: 't1', onPings });
+    const cb = mockWatchPositionAsync.mock.calls[0][1] as (loc: unknown) => void;
+    cb(sample(12.9, 77.6, Date.now()));
+    await until(() => !isBroadcasting());
+    const callsAtStop = onPings.mock.calls.length;
+    cb(sample(12.95, 77.65, Date.now() + 30_000));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(onPings.mock.calls.length).toBe(callsAtStop);
+  });
+
+  it('keeps the current trip broadcasting when an older queued trip is rejected with trip_ended', async () => {
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    await AsyncStorage.setItem('sms.trip.pingQueue', JSON.stringify([
+      { tripId: 'old', lat: 1, lng: 1, speedKmh: 0, heading: 0, at: 'x' },
+    ]));
+    const onPings = jest.fn()
+      .mockRejectedValueOnce(new AppError('trip_ended', 409, 'ended'))
+      .mockResolvedValue(undefined);
+    await startBroadcast({ tripId: 't2', onPings });
+    expect(onPings).toHaveBeenCalledWith('old', expect.any(Array));
+    // The *old* trip ended, not t2 — t2 must stay live.
+    expect(isBroadcasting()).toBe(true);
+    await expect(getPersistedBroadcastTripId()).resolves.toBe('t2');
+    await stopBroadcast();
+  });
+});

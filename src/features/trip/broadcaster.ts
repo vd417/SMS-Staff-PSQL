@@ -48,6 +48,11 @@ export interface BroadcastDeps {
 const isPermanent = (err: unknown) =>
   isAppError(err) && err.status >= 400 && err.status < 500 && err.status !== 401 && err.status !== 429;
 
+// The server confirms a trip is over by rejecting its pings with a trip_ended code (409):
+// the trip was ended here moments ago, or ended from another device.
+const isTripEnded = (err: unknown) =>
+  isAppError(err) && (err.code === 'trip_ended' || err.status === 409);
+
 function sendGrouped(onPings: BroadcastDeps['onPings']) {
   return async (pings: TripPing[]) => {
     const byTrip = new Map<string, TripPing[]>();
@@ -56,6 +61,15 @@ function sendGrouped(onPings: BroadcastDeps['onPings']) {
       try {
         await onPings(tripId, group);
       } catch (err) {
+        // If it's the *active* trip that the server says has ended, stop GPS on this device
+        // immediately (and clear persisted state so it can't auto-resume) — otherwise the
+        // foreground location service keeps draining the battery for a trip that's over.
+        // A stale queued group from an *older* trip just gets dropped, leaving the current
+        // trip broadcasting.
+        if (isTripEnded(err)) {
+          if (tripId === activeTripId) void stopBroadcast();
+          continue;
+        }
         if (!isPermanent(err)) throw err;
       }
     }
