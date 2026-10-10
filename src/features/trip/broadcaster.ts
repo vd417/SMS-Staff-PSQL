@@ -135,6 +135,11 @@ async function startBroadcastImpl({ tripId, onPings }: BroadcastDeps): Promise<b
           accuracy: Location.Accuracy.High,
           timeInterval: CADENCE_MS,
           distanceInterval: MIN_METERS,
+          // Tell iOS this is vehicle tracking so it can power-manage the GPS intelligently.
+          // Accuracy stays High and updates keep flowing while stationary (no auto-pause),
+          // so the school's live view is unchanged — this is a battery hint only (iOS-only;
+          // ignored on Android).
+          activityType: Location.ActivityType.AutomotiveNavigation,
           foregroundService: {
             notificationTitle: 'Trip live',
             notificationBody: 'Sharing the bus location with the school',

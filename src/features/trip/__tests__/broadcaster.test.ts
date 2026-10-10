@@ -30,6 +30,7 @@ jest.mock('expo-location', () => ({
   stopLocationUpdatesAsync: jest.fn(async () => {}),
   watchPositionAsync: (...args: unknown[]) => mockWatchPositionAsync(args[0], args[1] as never),
   Accuracy: { High: 6 },
+  ActivityType: { Other: 1, AutomotiveNavigation: 2 },
 }));
 
 beforeEach(async () => {
@@ -105,6 +106,18 @@ describe('startBroadcast', () => {
     expect(JSON.parse(await AsyncStorage.getItem('sms.trip.pingQueue'))).toEqual([
       { tripId: 't1', lat: 1, lng: 1, speedKmh: 0, heading: 0, at: 'x' },
     ]);
+    await stopBroadcast();
+  });
+
+  it('tags the background location service as automotive navigation so the OS can power-manage it', async () => {
+    const Location = jest.requireMock('expo-location');
+    // Background updates are supported this run, so the service (not the fg fallback) is used.
+    Location.startLocationUpdatesAsync.mockResolvedValueOnce(undefined);
+    await startBroadcast({ tripId: 't1', onPings: jest.fn(async () => {}) });
+    expect(Location.startLocationUpdatesAsync).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ activityType: Location.ActivityType.AutomotiveNavigation }),
+    );
     await stopBroadcast();
   });
 
