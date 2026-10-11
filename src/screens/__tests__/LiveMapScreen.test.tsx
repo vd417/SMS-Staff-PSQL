@@ -133,6 +133,26 @@ describe('LiveMapScreen', () => {
     );
   });
 
+  it('snaps the camera onto the driver on the first GPS fix even when the fix accuracy is poor', async () => {
+    const Location = require('expo-location');
+    // Only fix is too inaccurate for the smooth follow camera (>50m), so
+    // nextFollowCamera returns null. The screen must still centre on the driver
+    // once instead of staying zoomed out framing all the stops.
+    Location.watchPositionAsync.mockImplementationOnce(async (_opts: unknown, cb: (loc: unknown) => void) => {
+      mockLoc.emit = cb;
+      cb({ coords: { latitude: 12.11, longitude: 77.11, accuracy: 200 } });
+      return { remove: jest.fn() };
+    });
+    const { getByTestId } = renderScreen();
+    await waitFor(() => expect(getByTestId('has-live-marker')).toBeTruthy());
+    await waitFor(() =>
+      expect(mockMapHandle.animateToRegion).toHaveBeenCalledWith(
+        expect.objectContaining({ latitude: 12.11, longitude: 77.11 }),
+        expect.any(Number)
+      )
+    );
+  });
+
   it('recenters via an animated camera move and restores follow when the recenter button is pressed', async () => {
     const { getByTestId } = renderScreen();
     await waitFor(() => expect(getByTestId('has-live-marker')).toBeTruthy());

@@ -50,6 +50,7 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
   const geometry = useRouteGeometry(assignment.data?.route.id);
   const mapRef = useRef<LiveMapHandle>(null);
   const hasFitRef = useRef(false);
+  const hasCenteredRef = useRef(false);
   // Follow mode: camera tracks the driver (bearing + tilt) until the driver pans
   // the map by hand; the Re-center button turns it back on. camStateRef carries
   // the last applied bearing/zoom so transitions ease instead of jumping — kept in
@@ -154,27 +155,38 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
   const stateFor = (studentId: string): BoardingState =>
     boarding.data?.find((b) => b.studentId === studentId)?.state ?? 'absent';
 
-  // Fit the map once it has finished loading (the underlying Google Maps script
-  // resolves asynchronously on web — calling map methods any earlier throws).
+  // Before the first GPS fix, briefly frame the stops so the route is visible
+  // (the underlying Google Maps script resolves asynchronously on web — calling
+  // map methods any earlier throws). Once a fix arrives the follow effect below
+  // takes over and snaps to the driver, so we don't fit again.
   useEffect(() => {
-    if (hasFitRef.current || !mapReady || stops.length === 0) return;
+    if (hasFitRef.current || !mapReady || stops.length === 0 || liveMarker) return;
     hasFitRef.current = true;
-    const coords = toMapCoords(stops);
-    mapRef.current?.fitToCoordinates(liveMarker ? [...coords, liveMarker] : coords, {
+    mapRef.current?.fitToCoordinates(toMapCoords(stops), {
       edgePadding: { top: 100, right: 60, bottom: bottomCardHeight + 60, left: 60 },
       animated: false,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stops, mapReady]);
+  }, [stops, mapReady, liveMarker]);
 
   // Follow the driver imperatively on each GPS fix (no state churn). Skips fixes
-  // with poor accuracy and freezes bearing at low speed (see followCamera).
+  // with poor accuracy and freezes bearing at low speed (see followCamera). The
+  // first fix always snaps the camera onto the driver — even if it's too
+  // inaccurate for the smooth follow camera — so we never stay zoomed out on all
+  // the stops once we know where the driver is.
   useEffect(() => {
     if (!followMode || !mapReady || !liveMarker) return;
     const next = nextFollowCamera(camStateRef.current, liveMarker);
-    if (!next) return;
-    camStateRef.current = next.state;
-    mapRef.current?.animateCamera(next.camera, { duration: 500 });
+    if (next) {
+      camStateRef.current = next.state;
+      mapRef.current?.animateCamera(next.camera, { duration: 500 });
+    } else if (!hasCenteredRef.current) {
+      mapRef.current?.animateToRegion(
+        { latitude: liveMarker.latitude, longitude: liveMarker.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 },
+        500
+      );
+    }
+    hasCenteredRef.current = true;
   }, [liveMarker, followMode, mapReady]);
 
   // The driver dragged/zoomed the map by hand — stop auto-following until they
