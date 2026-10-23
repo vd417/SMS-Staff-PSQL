@@ -5,8 +5,11 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
+      // Keep going when the device is offline. A failed request becomes an error
+      // state the screen can retry; it does not reject the app open.
+      networkMode: 'always',
       retry: (failureCount, error) => {
-        if (isAppError(error) && error.status === 401) return false;
+        if (isAppError(error) && (error.status === 401 || error.code === 'network' || error.status === 0)) return false;
         return failureCount < 2;
       },
     },

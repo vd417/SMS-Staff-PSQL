@@ -4,6 +4,8 @@ import { Icon } from '@/components/icons';
 
 export interface BusMarkerProps {
   headingDeg?: number;
+  /** Larger pale ring while the van is off the route, so the bus icon stays easy to see. */
+  offRoute?: boolean;
 }
 
 /**
@@ -11,9 +13,9 @@ export interface BusMarkerProps {
  * readable) with a separate heading cone that rotates to the GPS bearing, over a soft accuracy
  * pulse ring. Heading is applied only to the cone, never the badge.
  */
-export const BusMarker: React.FC<BusMarkerProps> = ({ headingDeg }) => (
+export const BusMarker: React.FC<BusMarkerProps> = ({ headingDeg, offRoute }) => (
   <View testID="bus-marker" style={styles.wrap}>
-    <View style={styles.pulse} />
+    <View style={offRoute ? styles.pulseOffRoute : styles.pulse} />
     {headingDeg != null && (
       <View style={[styles.coneWrap, { transform: [{ rotate: `${headingDeg}deg` }] }]}>
         <View style={styles.cone} />
@@ -41,6 +43,14 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     backgroundColor: PRIMARY,
     opacity: 0.16,
+  },
+  pulseOffRoute: {
+    position: 'absolute',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#CDE7DF',
+    opacity: 0.95,
   },
   coneWrap: {
     position: 'absolute',

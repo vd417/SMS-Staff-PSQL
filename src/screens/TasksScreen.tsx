@@ -113,7 +113,7 @@ export const TasksScreen = () => {
   return (
     <SafeAreaView style={[styles.fill, { backgroundColor: colors.bg }]}>
       <Text style={[TextScale.screenTitle, styles.title, { color: colors.ink }]}>{t('nav.tasks')}</Text>
-      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 120 }]}>
+      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 160 }]}>
         {data?.map((task) => <TaskRow key={task.id} task={task} />)}
       </ScrollView>
     </SafeAreaView>

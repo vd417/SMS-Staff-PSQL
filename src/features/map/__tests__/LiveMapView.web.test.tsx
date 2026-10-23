@@ -117,7 +117,7 @@ describe('LiveMapView (web)', () => {
     expect(getByTestId('map-polyline')).toBeTruthy();
   });
 
-  it('renders no polyline and a Route unavailable badge when geometry is unavailable', () => {
+  it('draws the stop-to-stop path and a Route unavailable badge when geometry is unavailable', () => {
     process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY = 'test-key';
     const { queryByTestId, getByText } = renderWithTheme(
       <LiveMapView
@@ -130,7 +130,19 @@ describe('LiveMapView (web)', () => {
         }}
       />
     );
-    expect(queryByTestId('map-polyline')).toBeNull();
+    expect(queryByTestId('map-polyline')).toBeTruthy();
     expect(getByText(/route unavailable/i)).toBeTruthy();
+  });
+
+  it('shows the bus icon and a light highlight on each nearby stop when the van is off the route', () => {
+    process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY = 'test-key';
+    const { getByTestId } = renderWithTheme(
+      <LiveMapView stops={stops} liveMarker={{ latitude: 12.1, longitude: 77.098 }} />,
+    );
+    expect(within(getByTestId('map-live-marker')).getByTestId('bus-marker')).toBeTruthy();
+    expect(within(getByTestId('map-stop-s1')).getByTestId('stop-marker-near')).toBeTruthy();
+    expect(getByTestId('map-stop-s1')).toHaveTextContent('Gate');
+    expect(getByTestId('map-polyline-to-stop')).toBeTruthy();
+    expect(within(getByTestId('map-stop-s2')).queryByTestId('stop-marker-near')).toBeNull();
   });
 });

@@ -14,7 +14,7 @@ import { RouteUnavailableBadge } from './RouteUnavailableBadge';
 import { MapErrorBoundary } from './MapErrorBoundary';
 import { stopRoles } from './stopRoles';
 import { routeSegments } from './routeSegments';
-import { splitRouteProgress } from './routeProgress';
+import { pathToNearestStop, splitRouteProgress } from './routeProgress';
 import { useGlidedCoord } from './useGlidedCoord';
 import type { LiveMapViewProps, LiveMapHandle } from './liveMapTypes';
 
@@ -62,16 +62,21 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
   const safeLive = liveMarker && isFiniteCoord(liveMarker.latitude, liveMarker.longitude) ? liveMarker : null;
   const coords = toMapCoords(safeStops);
   const initial = coords[0] ?? { latitude: 0, longitude: 0 };
-  const roles = stopRoles(safeStops, safeLive);
   const segments = routeSegments(safeStops);
   // Decode once per geometry change, not on every GPS/glide re-render.
   const roadPath = useMemo(
     () => (routeGeometry?.status === 'available' && routeGeometry.geometry ? decodePolyline(routeGeometry.geometry) : null),
     [routeGeometry?.status, routeGeometry?.geometry],
   );
-  // Uber/Ola-style progress: dim the road already passed, highlight what's ahead. Split at the
-  // point nearest the bus; with no fix the whole route stays "ahead" (highlighted).
-  const route = roadPath && roadPath.length > 1 ? splitRouteProgress(roadPath, safeLive) : null;
+  // Road geometry when the server has it; otherwise the stop-to-stop path so the van
+  // still has a line to follow while geometry is loading or unavailable.
+  const line = roadPath && roadPath.length > 1 ? roadPath : coords.length > 1 ? coords : null;
+  // Route highlight: white casing under a colored line. On the route, dim what's behind.
+  // Off the route, keep one full route line and do not cut progress at a far snap.
+  const route = line && line.length > 1 ? splitRouteProgress(line, safeLive) : null;
+  const offRoute = route?.offRoute ?? false;
+  const roles = stopRoles(safeStops, safeLive, { offRoute });
+  const toNearestStop = pathToNearestStop(line ?? coords, safeLive, coords);
   // Glide the marker between the ~5 s fixes instead of letting it teleport.
   const glidedLive = useGlidedCoord(safeLive);
 
@@ -90,33 +95,40 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
         initialRegion={{ ...initial, latitudeDelta: 0.05, longitudeDelta: 0.05 }}
       >
         {route && route.ahead.length > 1 && (
-          <Polyline coordinates={route.ahead} strokeWidth={11} strokeColor={colors.surface} lineCap="round" lineJoin="round" />
+          <Polyline coordinates={route.ahead} strokeWidth={14} strokeColor="#FFFFFF" lineCap="round" lineJoin="round" geodesic />
         )}
         {route && route.traveled.length > 1 && (
-          <Polyline testID="map-polyline-traveled" coordinates={route.traveled} strokeWidth={6} strokeColor={colors.inkFaint} lineCap="round" lineJoin="round" />
+          <Polyline testID="map-polyline-traveled" coordinates={route.traveled} strokeWidth={8} strokeColor={colors.inkFaint} lineCap="round" lineJoin="round" geodesic />
         )}
         {route && route.ahead.length > 1 && (
-          <Polyline testID="map-polyline" coordinates={route.ahead} strokeWidth={7} strokeColor={colors.primary} lineCap="round" lineJoin="round" />
+          <Polyline testID="map-polyline" coordinates={route.ahead} strokeWidth={8} strokeColor={colors.primary} lineCap="round" lineJoin="round" geodesic />
+        )}
+        {toNearestStop.length > 1 && (
+          <Polyline coordinates={toNearestStop} strokeWidth={14} strokeColor="#FFFFFF" lineCap="round" lineJoin="round" geodesic />
+        )}
+        {toNearestStop.length > 1 && (
+          <Polyline testID="map-polyline-to-stop" coordinates={toNearestStop} strokeWidth={8} strokeColor={colors.gold} lineCap="round" lineJoin="round" geodesic />
         )}
         {segments.map((seg, i) => (
           <Marker key={`seg-${i}`} testID={`map-segment-${i}`} coordinate={seg.midpoint} anchor={{ x: 0.5, y: 0.5 }}>
             <RouteSegmentLabel distanceKm={seg.distanceKm} durationMin={seg.durationMin} />
           </Marker>
         ))}
-        {roles.map(({ stop, role, isDestination }) => (
+        {roles.map(({ stop, role, isDestination, near }) => (
           <Marker
             key={stop.id}
             testID={`map-stop-${stop.id}`}
             coordinate={{ latitude: stop.lat, longitude: stop.lng }}
             title={stop.name}
-            anchor={{ x: 0.5, y: 0.5 }}
+            anchor={{ x: 0.5, y: 0 }}
+            tracksViewChanges
           >
-            <StopMarker role={role} isDestination={isDestination} />
+            <StopMarker role={role} isDestination={isDestination} near={near} name={stop.name} />
           </Marker>
         ))}
         {glidedLive && (
-          <Marker testID="map-live-marker" coordinate={glidedLive} anchor={{ x: 0.5, y: 0.5 }}>
-            <BusMarker headingDeg={glidedLive.headingDeg} />
+          <Marker testID="map-live-marker" coordinate={glidedLive} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges>
+            <BusMarker headingDeg={glidedLive.headingDeg} offRoute={offRoute} />
           </Marker>
         )}
       </MapView>

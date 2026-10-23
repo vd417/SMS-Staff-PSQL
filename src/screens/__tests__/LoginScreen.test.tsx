@@ -5,24 +5,24 @@ import { LoginScreen } from '@/screens/LoginScreen';
 
 function renderLogin() { return render(<AppProviders><LoginScreen /></AppProviders>); }
 
-it('password login is the default mode: phone + password fields, CTA disabled until both are valid', async () => {
-  const { getByTestId } = renderLogin();
-  await waitFor(() => getByTestId('phone-input'));
+it('password login is the default mode: one identifier field + password, CTA disabled until both are valid', async () => {
+  const { getByTestId, queryByTestId } = renderLogin();
+  await waitFor(() => getByTestId('identifier-input'));
+  expect(queryByTestId('channel-mobile')).toBeNull();
+  expect(queryByTestId('channel-email')).toBeNull();
   expect(getByTestId('login-cta').props.accessibilityState?.disabled).toBe(true);
-  fireEvent.changeText(getByTestId('phone-input'), '98765 43210');
+  fireEvent.changeText(getByTestId('identifier-input'), '98765 43210');
   fireEvent.changeText(getByTestId('password-input'), 'hunter2222');
   await waitFor(() => expect(getByTestId('login-cta').props.accessibilityState?.disabled).toBe(false));
 });
 
-it('switching to the Email tab swaps in an email field with its own validation', async () => {
+it('the same field accepts an email without a separate Email tab', async () => {
   const { getByTestId } = renderLogin();
-  await waitFor(() => getByTestId('channel-email'));
-  fireEvent.press(getByTestId('channel-email'));
-  await waitFor(() => getByTestId('email-input'));
-  fireEvent.changeText(getByTestId('email-input'), 'not-an-email');
+  await waitFor(() => getByTestId('identifier-input'));
+  fireEvent.changeText(getByTestId('identifier-input'), 'not-an-email');
   fireEvent.changeText(getByTestId('password-input'), 'hunter2222');
   expect(getByTestId('login-cta').props.accessibilityState?.disabled).toBe(true);
-  fireEvent.changeText(getByTestId('email-input'), 'ramesh@example.com');
+  fireEvent.changeText(getByTestId('identifier-input'), 'ramesh@example.com');
   await waitFor(() => expect(getByTestId('login-cta').props.accessibilityState?.disabled).toBe(false));
 });
 
@@ -38,8 +38,8 @@ it('sending an OTP shows the code and password fields together on one screen', a
   const { getByTestId, queryByTestId } = renderLogin();
   await waitFor(() => getByTestId('first-time-link'));
   fireEvent.press(getByTestId('first-time-link'));
-  await waitFor(() => getByTestId('phone-input'));
-  fireEvent.changeText(getByTestId('phone-input'), '98765 43210');
+  await waitFor(() => getByTestId('identifier-input'));
+  fireEvent.changeText(getByTestId('identifier-input'), '98765 43210');
   await waitFor(() => expect(getByTestId('send-otp-cta').props.accessibilityState?.disabled).toBe(false));
   fireEvent.press(getByTestId('send-otp-cta'));
   // OTP entry and password creation are on the same screen now.
@@ -55,8 +55,8 @@ it('the activate CTA stays disabled until code, password and confirmation are al
   const { getByTestId } = renderLogin();
   await waitFor(() => getByTestId('first-time-link'));
   fireEvent.press(getByTestId('first-time-link'));
-  await waitFor(() => getByTestId('phone-input'));
-  fireEvent.changeText(getByTestId('phone-input'), '98765 43210');
+  await waitFor(() => getByTestId('identifier-input'));
+  fireEvent.changeText(getByTestId('identifier-input'), '98765 43210');
   await waitFor(() => expect(getByTestId('send-otp-cta').props.accessibilityState?.disabled).toBe(false));
   fireEvent.press(getByTestId('send-otp-cta'));
   await waitFor(() => getByTestId('activate-cta'));

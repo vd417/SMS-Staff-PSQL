@@ -2,6 +2,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/theme';
 import { Icon } from '@/components/icons';
 import type { IconName } from '@/components/icons';
@@ -23,12 +24,20 @@ const TAB_ICONS: Record<string, IconName> = {
   Me: 'user',
 };
 
-const BAR_HEIGHT = 64;
-const BAR_MARGIN_BOTTOM = 26;
+const TAB_LABEL_KEY: Record<string, string> = {
+  Home: 'nav.home',
+  Tasks: 'nav.tasks',
+  Leave: 'nav.leave',
+  Inbox: 'nav.inbox',
+  Me: 'nav.me',
+};
+
+const BAR_HEIGHT = 76;
 const BAR_SIDE_INSET = 14;
 const BAR_RADIUS = 26;
 
 export const TabBar: React.FC<TabBarProps> = ({ state, navigation, descriptors }) => {
+  const { t } = useTranslation();
   const { colors, role } = useTheme();
   const insets = useSafeAreaInsets();
   const inboxUnread = useChatUnread();
@@ -51,7 +60,8 @@ export const TabBar: React.FC<TabBarProps> = ({ state, navigation, descriptors }
     const isFocused = index === activeIndex;
     const iconName = TAB_ICONS[route.name] ?? 'home';
     const iconColor = isFocused ? role.accent : colors.inkFaint;
-    const label = descriptors[route.key]?.options.tabBarAccessibilityLabel ?? route.name;
+    const labelKey = TAB_LABEL_KEY[route.name];
+    const label = labelKey ? t(labelKey) : (descriptors[route.key]?.options.tabBarAccessibilityLabel ?? route.name);
 
     return (
       <Pressable
@@ -63,18 +73,23 @@ export const TabBar: React.FC<TabBarProps> = ({ state, navigation, descriptors }
         accessibilityState={{ selected: isFocused }}
         accessibilityLabel={label}
       >
-        <View>
-          <Icon
-            name={iconName}
-            size={24}
-            color={iconColor}
-            strokeWidth={isFocused ? 2.5 : 2}
-          />
-          {route.name === 'Inbox' && inboxUnread > 0 ? (
-            <View testID="inbox-badge" style={[styles.badge, { backgroundColor: colors.danger, borderColor: colors.surface }]}>
-              <Text style={[TextScale.caption, styles.badgeText]}>{inboxUnread > 9 ? '9+' : String(inboxUnread)}</Text>
-            </View>
-          ) : null}
+        <View style={styles.tabInner}>
+          <View>
+            <Icon
+              name={iconName}
+              size={22}
+              color={iconColor}
+              strokeWidth={isFocused ? 2.5 : 2}
+            />
+            {route.name === 'Inbox' && inboxUnread > 0 ? (
+              <View testID="inbox-badge" style={[styles.badge, { backgroundColor: colors.danger, borderColor: colors.surface }]}>
+                <Text style={[TextScale.caption, styles.badgeText]}>{inboxUnread > 9 ? '9+' : String(inboxUnread)}</Text>
+              </View>
+            ) : null}
+          </View>
+          <Text numberOfLines={1} style={[styles.tabLabel, { color: iconColor }]}>
+            {label}
+          </Text>
         </View>
       </Pressable>
     );
@@ -84,7 +99,13 @@ export const TabBar: React.FC<TabBarProps> = ({ state, navigation, descriptors }
     <View
       style={[
         styles.outerContainer,
-        { paddingBottom: insets.bottom + BAR_MARGIN_BOTTOM, pointerEvents: 'box-none' },
+        {
+          paddingBottom: insets.bottom + 8,
+          paddingTop: 8,
+          backgroundColor: colors.bg,
+          borderTopColor: colors.line,
+          pointerEvents: 'box-none',
+        },
       ]}
     >
       <View
@@ -92,7 +113,7 @@ export const TabBar: React.FC<TabBarProps> = ({ state, navigation, descriptors }
           styles.bar,
           {
             backgroundColor: colors.surface,
-            shadowColor: colors.inkFaint,
+            shadowColor: colors.ink,
             borderColor: colors.line,
           },
         ]}
@@ -109,10 +130,11 @@ const styles = StyleSheet.create({
   outerContainer: {
     position: 'absolute',
     bottom: 0,
-    left: BAR_SIDE_INSET,
-    right: BAR_SIDE_INSET,
+    left: 0,
+    right: 0,
+    paddingHorizontal: BAR_SIDE_INSET,
     alignItems: 'center',
-    // Let touches pass through the transparent area
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   bar: {
     width: '100%',
@@ -140,6 +162,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     height: BAR_HEIGHT,
     minWidth: 44,
+    paddingHorizontal: 2,
+  },
+  tabInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  tabLabel: {
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   badge: {
     position: 'absolute',

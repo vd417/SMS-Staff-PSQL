@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, Pressable, Text, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -21,6 +21,27 @@ import {
 import { RootNavigator } from '@/navigation/RootNavigator';
 import { AppProviders } from '@/providers/AppProviders';
 import { initI18n } from '@/i18n';
+
+class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError(): { failed: boolean } {
+    return { failed: true };
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <View style={styles.loading}>
+        <Text style={styles.offlineTitle}>No internet</Text>
+        <Text style={styles.offlineBody}>The app is still open. Connect and try again.</Text>
+        <Pressable onPress={() => this.setState({ failed: false })} style={styles.retry}>
+          <Text style={styles.retryLabel}>Try again</Text>
+        </Pressable>
+      </View>
+    );
+  }
+}
 
 export default function App() {
   // Load Sora (display) + Manrope (body) together via expo-font's useFonts.
@@ -55,20 +76,26 @@ export default function App() {
   }
 
   return (
-    <GestureHandlerRootView style={styles.flex}>
-      <SafeAreaProvider>
-        <AppProviders>
-          <NavigationContainer>
-            <StatusBar style="auto" />
-            <RootNavigator />
-          </NavigationContainer>
-        </AppProviders>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <AppErrorBoundary>
+      <GestureHandlerRootView style={styles.flex}>
+        <SafeAreaProvider>
+          <AppProviders>
+            <NavigationContainer>
+              <StatusBar style="auto" />
+              <RootNavigator />
+            </NavigationContainer>
+          </AppProviders>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </AppErrorBoundary>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F2EEE4' },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F2EEE4', padding: 24, gap: 8 },
+  offlineTitle: { fontSize: 20, fontWeight: '700', color: '#1A2E26' },
+  offlineBody: { fontSize: 14, color: '#4E6158', textAlign: 'center' },
+  retry: { marginTop: 12, backgroundColor: '#0E5C4A', borderRadius: 12, paddingHorizontal: 18, paddingVertical: 12 },
+  retryLabel: { color: '#FFFFFF', fontWeight: '700' },
 });

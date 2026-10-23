@@ -44,6 +44,8 @@ describe('LiveMapView (native)', () => {
     );
     expect(getAllByTestId(/^map-stop-/)).toHaveLength(2);
     expect(getByTestId('map-polyline')).toBeTruthy();
+    expect(getByTestId('map-stop-s1')).toHaveTextContent('Gate');
+    expect(getByTestId('map-stop-s2')).toHaveTextContent('Market');
   });
 
   it('renders a live marker only when liveMarker is provided', () => {
@@ -98,7 +100,7 @@ describe('LiveMapView (native)', () => {
     expect(getByTestId('map-polyline')).toBeTruthy();
   });
 
-  it('renders no polyline and a Route unavailable badge when geometry is unavailable', () => {
+  it('draws the stop-to-stop path and a Route unavailable badge when geometry is unavailable', () => {
     const { queryByTestId, getByText } = renderWithTheme(
       <LiveMapView
         stops={stops}
@@ -110,13 +112,28 @@ describe('LiveMapView (native)', () => {
         }}
       />
     );
-    expect(queryByTestId('map-polyline')).toBeNull();
+    expect(queryByTestId('map-polyline')).toBeTruthy();
     expect(getByText(/route unavailable/i)).toBeTruthy();
   });
 
-  it('renders no polyline and no badge while geometry has not loaded yet', () => {
-    const { queryByTestId } = renderWithTheme(<LiveMapView stops={stops} liveMarker={null} />);
-    expect(queryByTestId('map-polyline')).toBeNull();
+  it('shows the bus icon and a light highlight on each nearby stop when the van is off the route', () => {
+    const { getByTestId, queryByTestId } = renderWithTheme(
+      <LiveMapView
+        stops={stops}
+        liveMarker={{ latitude: 12.1, longitude: 77.098 }}
+      />,
+    );
+    expect(within(getByTestId('map-live-marker')).getByTestId('bus-marker')).toBeTruthy();
+    expect(within(getByTestId('map-stop-s1')).getByTestId('stop-marker-near')).toBeTruthy();
+    expect(getByTestId('map-stop-s1')).toHaveTextContent('Gate');
+    expect(getByTestId('map-polyline-to-stop')).toBeTruthy();
+    expect(within(getByTestId('map-stop-s2')).queryByTestId('stop-marker-near')).toBeNull();
+    expect(queryByTestId('map-polyline')).toBeTruthy();
+  });
+
+  it('draws the stop-to-stop path and no badge while geometry has not loaded yet', () => {
+    const { queryByTestId, getByTestId } = renderWithTheme(<LiveMapView stops={stops} liveMarker={null} />);
+    expect(getByTestId('map-polyline')).toBeTruthy();
     expect(queryByTestId('route-unavailable-badge')).toBeNull();
   });
 });

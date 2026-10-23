@@ -48,6 +48,14 @@ describe('nextFollowCamera', () => {
     const r = nextFollowCamera({ heading: 42, zoom: 17 }, { latitude: 1, longitude: 2, headingDeg: 200, speedKmh: 1, accuracyM: 5 });
     expect(r!.camera.heading).toBe(42);
   });
+  it('aims at the route when the van is stopped and GPS heading is unreliable', () => {
+    const r = nextFollowCamera(
+      { heading: 0, zoom: 17 },
+      { latitude: 1, longitude: 2, speedKmh: 0, accuracyM: 5, routeHeadingDeg: 90 },
+    );
+    expect(r!.camera.heading).toBeGreaterThan(0);
+    expect(r!.camera.heading).toBeLessThanOrEqual(90);
+  });
   it('freezes the bearing when GPS heading is missing', () => {
     const r = nextFollowCamera({ heading: 42, zoom: 17 }, { latitude: 1, longitude: 2, speedKmh: 30, accuracyM: 5 });
     expect(r!.camera.heading).toBe(42);

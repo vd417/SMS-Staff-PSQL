@@ -27,7 +27,7 @@ export const ProfileScreen = () => {
 
   return (
     <SafeAreaView style={[styles.fill, { backgroundColor: colors.bg }]}>
-      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 120 }]}>
+      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 160 }]}>
         <View style={styles.identity}>
           <Avatar name={u.name} size={64} ring={role.accent} />
           <View style={styles.identityText}>

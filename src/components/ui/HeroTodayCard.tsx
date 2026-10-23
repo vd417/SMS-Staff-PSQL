@@ -47,6 +47,12 @@ export const HeroTodayCard: React.FC<HeroTodayCardProps> = ({
   const { colors, role } = useTheme();
   const { t } = useTranslation();
   const [elapsed, setElapsed] = useState<string>('');
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     if (!checkedIn || !checkInAt) return;
@@ -59,6 +65,10 @@ export const HeroTodayCard: React.FC<HeroTodayCardProps> = ({
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [checkedIn, checkInAt]);
+
+  const checkInDate = checkedIn && checkInAt ? new Date(checkInAt) : null;
+  const dateSource = checkInDate && !Number.isNaN(checkInDate.getTime()) ? checkInDate : now;
+  const dateLabel = dateSource.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
 
   const gradientColors: [string, string] = checkedIn
     ? [role.accent, role.accent]
@@ -74,6 +84,10 @@ export const HeroTodayCard: React.FC<HeroTodayCardProps> = ({
       end={{ x: 1, y: 1 }}
       style={styles.card}
     >
+      <Text testID="hero-today-date" style={[TextScale.bodyStrong, { color: onPrimaryColor }]}>
+        {dateLabel}
+      </Text>
+
       {/* Status pill */}
       <Pill
         label={checkedIn ? t('home.onDuty') : t('home.notCheckedIn')}
@@ -87,7 +101,9 @@ export const HeroTodayCard: React.FC<HeroTodayCardProps> = ({
           <Text style={[TextScale.micro, { color: 'rgba(255,255,255,0.7)' }]}>
             {t('home.timing')}
           </Text>
-          <Text style={[TextScale.body, { color: onPrimaryColor }]}>{timing || '—'}</Text>
+          <Text testID="hero-timing" style={[TextScale.body, { color: onPrimaryColor }]}>
+            {timing || (checkedIn && checkInAt ? formatLocalTime(checkInAt) : '—')}
+          </Text>
         </View>
         <View style={styles.column}>
           <Text style={[TextScale.micro, { color: 'rgba(255,255,255,0.7)' }]}>

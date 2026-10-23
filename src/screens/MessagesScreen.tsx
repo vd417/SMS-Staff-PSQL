@@ -13,7 +13,7 @@ import type { ChatThread, ChatContact } from '@/data/domain';
 const formatTime = (iso?: string) => (iso ? new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
 // The bottom tab bar floats over content (height 64 + 26 margin), so screens inside a tab must
 // leave room or their content/composer hides behind it.
-const TAB_BAR_CLEARANCE = 100;
+const TAB_BAR_CLEARANCE = 150;
 
 export const MessagesScreen = () => {
   const { t } = useTranslation();

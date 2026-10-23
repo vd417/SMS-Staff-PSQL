@@ -18,6 +18,7 @@ let publish: ((ping: TripPing) => Promise<void>) | null = null;
 let last: Sample | null = null;
 let foregroundWatcher: { remove: () => void } | null = null;
 
+try {
 TaskManager.defineTask(TRIP_LOCATION_TASK, async ({ data, error }) => {
   if (error || !data || !activeTripId || !publish) return;
   const { locations } = data as { locations: Location.LocationObject[] };
@@ -37,6 +38,9 @@ TaskManager.defineTask(TRIP_LOCATION_TASK, async ({ data, error }) => {
     try { await publish(ping); } catch { /* offline — buffer retries on next event */ }
   }
 });
+} catch {
+  // Web and some dev runtimes have no native task manager. A throw here crashes app open.
+}
 
 export interface BroadcastDeps {
   tripId: string;
@@ -78,6 +82,18 @@ function sendGrouped(onPings: BroadcastDeps['onPings']) {
 
 export const isBroadcasting = (): boolean => activeTripId !== null;
 export const getPersistedBroadcastTripId = (): Promise<string | null> => asyncStore.get<string>(BROADCAST_TRIP_KEY);
+
+// A stopped van at the first pickup never moves 50 m, so a distance-gated watcher
+// never delivers a fix and the trip looks offline. Take one reading immediately.
+async function publishCurrentFix(): Promise<void> {
+  if (typeof Location.getCurrentPositionAsync !== 'function') return;
+  try {
+    const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+    publishFromLocation(loc);
+  } catch {
+    // The watcher still delivers fixes. A failed one-shot must not take the trip offline.
+  }
+}
 
 function publishFromLocation(loc: Location.LocationObject): void {
   if (!activeTripId || !publish) return;
@@ -127,6 +143,7 @@ async function startBroadcastImpl({ tripId, onPings }: BroadcastDeps): Promise<b
     await buffer.flush();
     publish = (ping) => buffer.enqueue(ping).then(() => buffer.flush());
     await asyncStore.set(BROADCAST_TRIP_KEY, tripId);
+    void publishCurrentFix();
 
     const bg = await Location.requestBackgroundPermissionsAsync();
     if (bg.status === 'granted') {
@@ -134,7 +151,9 @@ async function startBroadcastImpl({ tripId, onPings }: BroadcastDeps): Promise<b
         await Location.startLocationUpdatesAsync(TRIP_LOCATION_TASK, {
           accuracy: Location.Accuracy.High,
           timeInterval: CADENCE_MS,
-          distanceInterval: MIN_METERS,
+          // 0 so a van waiting at a stop still shares on the time cadence. shouldPublish
+          // drops anything closer than MIN_METERS inside that window.
+          distanceInterval: 0,
           // Tell iOS this is vehicle tracking so it can power-manage the GPS intelligently.
           // Accuracy stays High and updates keep flowing while stationary (no auto-pause),
           // so the school's live view is unchanged — this is a battery hint only (iOS-only;
@@ -155,7 +174,7 @@ async function startBroadcastImpl({ tripId, onPings }: BroadcastDeps): Promise<b
     }
 
     foregroundWatcher = await Location.watchPositionAsync(
-      { accuracy: Location.Accuracy.High, timeInterval: CADENCE_MS, distanceInterval: MIN_METERS },
+      { accuracy: Location.Accuracy.High, timeInterval: CADENCE_MS, distanceInterval: 0 },
       publishFromLocation
     );
     return true;

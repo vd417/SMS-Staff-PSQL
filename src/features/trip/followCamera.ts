@@ -8,6 +8,8 @@ export interface FollowFix {
   headingDeg?: number;
   speedKmh?: number;
   accuracyM?: number;
+  /** Bearing toward the next stop. Used when GPS heading is unreliable (stopped or missing). */
+  routeHeadingDeg?: number;
 }
 
 /** The last camera values we applied, carried between fixes so transitions ease. */
@@ -67,7 +69,14 @@ export function nextFollowCamera(
     fix.headingDeg >= 0 &&
     (fix.speedKmh == null || fix.speedKmh >= MIN_SPEED_FOR_HEADING_KMH);
 
-  const heading = headingUsable ? smoothHeading(prev.heading, fix.headingDeg as number) : prev.heading;
+  // GPS bearing is noise while the van is stopped at pickup. Aim at the route instead
+  // so the camera and the van point down the path the moment the trip starts.
+  const targetHeading = headingUsable
+    ? (fix.headingDeg as number)
+    : fix.routeHeadingDeg != null && fix.routeHeadingDeg >= 0
+      ? fix.routeHeadingDeg
+      : null;
+  const heading = targetHeading != null ? smoothHeading(prev.heading, targetHeading) : prev.heading;
   const zoom = prev.zoom + (zoomForSpeed(fix.speedKmh) - prev.zoom) * ZOOM_EASE;
 
   return {

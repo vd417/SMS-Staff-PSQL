@@ -13,6 +13,7 @@ import { VehicleCheckScreen } from '@/screens/VehicleCheckScreen';
 import { LiveMapScreen } from '@/screens/LiveMapScreen';
 import { RoutePreviewScreen } from '@/screens/RoutePreviewScreen';
 import { MessagesScreen } from '@/screens/MessagesScreen';
+import { useTheme } from '@/theme';
 import { TabBar } from '@/components/ui';
 import type { MainStackParamList, MainTabParamList } from './types';
 
@@ -23,9 +24,11 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 // Attendance is reached from Home's "Tap to check in" card and Profile's
 // "My attendance" button — both navigate to the 'Attendance' sibling route
 // in the parent native-stack.
-const TabsNavigator = () => (
+const TabsNavigator = () => {
+  const { colors } = useTheme();
+  return (
   <Tab.Navigator
-    screenOptions={{ headerShown: false }}
+    screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.bg } }}
     tabBar={(props) => <TabBar {...props} />}
   >
     <Tab.Screen name="Home" component={HomeScreen} />
@@ -34,7 +37,8 @@ const TabsNavigator = () => (
     <Tab.Screen name="Inbox" component={MessagesScreen} />
     <Tab.Screen name="Me" component={ProfileScreen} />
   </Tab.Navigator>
-);
+  );
+};
 
 // Exported navigator: a native-stack wrapping the tabs + the Attendance overlay.
 export const MainTabNavigator = () => (

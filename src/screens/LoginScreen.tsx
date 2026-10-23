@@ -14,12 +14,10 @@ import {
   Btn,
   BrandCap,
   LanguagePicker,
-  PhoneField,
   TextField,
 } from '@/components/ui';
 import { Icon } from '@/components/icons';
 
-type Channel = 'mobile' | 'email';
 type Mode = 'password' | 'otp-request' | 'otp-activate';
 const MIN_PASSWORD_LEN = 8;
 
@@ -38,6 +36,19 @@ function isValidEmail(raw: string): boolean {
   return emailSchema.safeParse(raw.trim()).success;
 }
 
+function looksLikeEmail(raw: string): boolean {
+  return /[a-zA-Z@]/.test(raw);
+}
+
+function normalizeIdentifier(raw: string): string {
+  const trimmed = raw.trim();
+  return looksLikeEmail(trimmed) ? trimmed : stripPhone(trimmed);
+}
+
+function isValidIdentifier(raw: string): boolean {
+  return looksLikeEmail(raw) ? isValidEmail(raw) : isValidPhone(raw);
+}
+
 export const LoginScreen = () => {
   const { t } = useTranslation();
   const { colors, roleKey } = useTheme();
@@ -45,10 +56,8 @@ export const LoginScreen = () => {
   const requestOtp = useRequestOtp();
   const activate = useActivateWithOtp();
 
-  const [channel, setChannel] = useState<Channel>('mobile');
   const [mode, setMode] = useState<Mode>('password');
-  const [phone, setPhone] = useState('98765 43210');
-  const [email, setEmail] = useState('');
+  const [identifierInput, setIdentifierInput] = useState('');
   const [password, setPasswordInput] = useState('');
   const [code, setCode] = useState('');
   const [destination, setDestination] = useState('');
@@ -58,9 +67,10 @@ export const LoginScreen = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [setupTouched, setSetupTouched] = useState(false);
 
-  const identifier = channel === 'mobile' ? stripPhone(phone) : email.trim();
-  const identifierValid = channel === 'mobile' ? isValidPhone(phone) : isValidEmail(email);
+  const identifier = normalizeIdentifier(identifierInput);
+  const identifierValid = isValidIdentifier(identifierInput);
   const showIdentifierError = touched && !identifierValid && identifier.length > 0;
+  const identifierError = looksLikeEmail(identifierInput) ? t('login.invalidEmail') : t('login.invalidPhone');
   const passwordValid = password.length >= MIN_PASSWORD_LEN;
 
   const loginErr = login.error ? authErrorMessage(login.error) : null;
@@ -84,13 +94,6 @@ export const LoginScreen = () => {
     setSetupTouched(false);
     requestOtp.reset();
     activate.reset();
-  }
-
-  function handleChangeChannel(next: Channel) {
-    setChannel(next);
-    setTouched(false);
-    resetOtpState();
-    login.reset();
   }
 
   function enterOtpSetup() {
@@ -191,56 +194,17 @@ export const LoginScreen = () => {
           </Text>
         </View>
 
-        <View style={[styles.tabRow, { backgroundColor: colors.surface, borderColor: colors.sunken }]}>
-          <Pressable
-            testID="channel-mobile"
-            onPress={() => handleChangeChannel('mobile')}
-            style={[styles.tab, channel === 'mobile' && { backgroundColor: accent }]}
-          >
-            <Text
-              style={[
-                TextScale.button,
-                { color: channel === 'mobile' ? colors.onPrimary : colors.inkSoft },
-              ]}
-            >
-              {t('login.mobileTab')}
-            </Text>
-          </Pressable>
-          <Pressable
-            testID="channel-email"
-            onPress={() => handleChangeChannel('email')}
-            style={[styles.tab, channel === 'email' && { backgroundColor: accent }]}
-          >
-            <Text
-              style={[
-                TextScale.button,
-                { color: channel === 'email' ? colors.onPrimary : colors.inkSoft },
-              ]}
-            >
-              {t('login.emailTab')}
-            </Text>
-          </Pressable>
-        </View>
-
-        {channel === 'mobile' ? (
-          <PhoneField
-            value={phone}
-            onChangeText={(v) => { setPhone(v); setTouched(true); }}
-            accent={accent}
-            error={showIdentifierError ? t('login.invalidPhone') : undefined}
-          />
-        ) : (
-          <TextField
-            testID="email-input"
-            value={email}
-            onChangeText={(v) => { setEmail(v); setTouched(true); }}
-            accent={accent}
-            icon="mail"
-            placeholder={t('login.email')}
-            keyboardType="email-address"
-            error={showIdentifierError ? t('login.invalidEmail') : undefined}
-          />
-        )}
+        <TextField
+          testID="identifier-input"
+          value={identifierInput}
+          onChangeText={(v) => { setIdentifierInput(v); setTouched(true); }}
+          accent={accent}
+          icon={looksLikeEmail(identifierInput) ? 'mail' : 'phone'}
+          placeholder={t('login.mobileOrEmail')}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          error={showIdentifierError ? identifierError : undefined}
+        />
 
         {mode === 'password' && (
           <>
@@ -377,20 +341,6 @@ const styles = StyleSheet.create({
   },
   greetingBlock: {
     gap: 6,
-  },
-  tabRow: {
-    flexDirection: 'row',
-    borderRadius: 100,
-    borderWidth: 1.5,
-    padding: 4,
-    gap: 4,
-  },
-  tab: {
-    flex: 1,
-    height: 44,
-    borderRadius: 100,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   codeSentText: {
     marginTop: -8,

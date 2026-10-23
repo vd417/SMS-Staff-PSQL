@@ -82,8 +82,8 @@ it('logs in with identifier + password and lands on Home with school identity', 
   const { getByTestId, findByText } = renderApp();
   await pastSplash(getByTestId);
 
-  // Login screen defaults to password mode; phone field is pre-filled valid.
-  await waitFor(() => getByTestId('password-input'), { timeout: 5000 });
+  await waitFor(() => getByTestId('identifier-input'), { timeout: 5000 });
+  fireEvent.changeText(getByTestId('identifier-input'), '9876543210');
   fireEvent.changeText(getByTestId('password-input'), 'hunter2222');
   await waitFor(() => expect(getByTestId('login-cta').props.accessibilityState?.disabled).toBe(false));
   fireEvent.press(getByTestId('login-cta'));
@@ -98,8 +98,9 @@ it('first-time staff: enter OTP + new password on one screen -> lands on the aut
   await waitFor(() => getByTestId('first-time-link'), { timeout: 5000 });
   fireEvent.press(getByTestId('first-time-link'));
 
-  // Phone field defaults to '98765 43210' (valid), so send-otp-cta is enabled.
-  await waitFor(() => getByTestId('send-otp-cta'), { timeout: 3000 });
+  await waitFor(() => getByTestId('identifier-input'), { timeout: 3000 });
+  fireEvent.changeText(getByTestId('identifier-input'), '9876543210');
+  await waitFor(() => expect(getByTestId('send-otp-cta').props.accessibilityState?.disabled).toBe(false));
   fireEvent.press(getByTestId('send-otp-cta'));
 
   // OTP entry and password creation now share one screen.

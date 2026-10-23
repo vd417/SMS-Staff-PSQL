@@ -52,4 +52,12 @@ describe('HeroTodayCard', () => {
     unmount();
     expect(clearSpy).toHaveBeenCalled();
   });
+
+  it('fills the timing column with the check-in time when shift timing is blank', () => {
+    const checkInAt = new Date(2026, 5, 8, 7, 30, 0).toISOString();
+    const { getByTestId } = renderWithTheme(
+      <HeroTodayCard {...BASE_PROPS} timing="" checkedIn checkInAt={checkInAt} onPressCheckIn={jest.fn()} />,
+    );
+    expect(getByTestId('hero-timing')).toHaveTextContent('7:30 AM');
+  });
 });

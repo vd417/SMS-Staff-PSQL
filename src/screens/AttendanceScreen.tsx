@@ -19,6 +19,7 @@ import {
   type ConfettiHandle,
   IconBtn,
   useToast,
+  AttendanceCalendar,
 } from '@/components/ui';
 import {
   useAttendanceStatus,
@@ -26,6 +27,7 @@ import {
   useCheckIn,
   useCheckOut,
 } from '@/features/attendance/hooks';
+import { useLeaveSummary } from '@/features/leave/hooks';
 import { distanceMeters, formatDistance } from '@/lib/geo';
 import { env } from '@/config/env';
 import type { AttendanceLog } from '@/data/domain';
@@ -100,6 +102,7 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({ navigation }
   const toast = useToast();
 
   const att = useAttendanceStatus();
+  const leave = useLeaveSummary();
   const schoolLocation = useSchoolLocation();
   const checkIn = useCheckIn();
   const checkOut = useCheckOut();
@@ -332,6 +335,11 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({ navigation }
         <Text style={[TextScale.body, styles.helperText, { color: colors.inkSoft }]}>
           {helperText}
         </Text>
+
+        <AttendanceCalendar
+          logs={history}
+          leaveRequests={(leave.data?.requests ?? []).filter((r) => r.status !== 'rejected')}
+        />
 
         {/* Check-in/check-out history */}
         <View style={styles.historySection}>

@@ -31,6 +31,21 @@ describe('stopRoles', () => {
     ]);
   });
 
+  it('lights each stop near the bus when the bus is off the route', () => {
+    const roles = stopRoles(stops, { latitude: 12.1018, longitude: 77.1 }, { offRoute: true });
+    expect(roles.map((r) => [r.stop.id, r.near])).toEqual([
+      ['a', true],
+      ['b', false],
+      ['c', false],
+    ]);
+  });
+
+  it('does not treat a far stop as current while the bus is off the route', () => {
+    const roles = stopRoles(stops, { latitude: 13, longitude: 78 }, { offRoute: true });
+    expect(roles.every((r) => !r.near)).toBe(true);
+    expect(roles.find((r) => r.role === 'current')).toBeUndefined();
+  });
+
   it('leaves no stop marked next when the bus has reached the final stop', () => {
     const roles = stopRoles(stops, { latitude: 12.3, longitude: 77.3 });
     expect(roles.map((r) => [r.stop.id, r.role])).toEqual([

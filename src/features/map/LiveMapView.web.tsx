@@ -9,9 +9,10 @@ import { BusMarker } from './BusMarker';
 import { StopMarker } from './StopMarker';
 import { RouteSegmentLabel } from './RouteSegmentLabel';
 import { RouteUnavailableBadge } from './RouteUnavailableBadge';
+import { MapErrorBoundary } from './MapErrorBoundary';
 import { stopRoles } from './stopRoles';
 import { routeSegments } from './routeSegments';
-import { splitRouteProgress } from './routeProgress';
+import { pathToNearestStop, splitRouteProgress } from './routeProgress';
 import { useGlidedCoord } from './useGlidedCoord';
 import type { LiveMapViewProps, LiveMapHandle } from './liveMapTypes';
 
@@ -66,13 +67,17 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
   const safeLive = liveMarker && isFiniteCoord(liveMarker.latitude, liveMarker.longitude) ? liveMarker : null;
   const coords = toMapCoords(safeStops);
   const initial = coords[0] ?? { latitude: 0, longitude: 0 };
-  const roles = stopRoles(safeStops, safeLive);
   const segments = routeSegments(safeStops);
   const roadPath = useMemo(
     () => (routeGeometry?.status === 'available' && routeGeometry.geometry ? decodePolyline(routeGeometry.geometry) : null),
     [routeGeometry?.status, routeGeometry?.geometry],
   );
-  const route = roadPath && roadPath.length > 1 ? splitRouteProgress(roadPath, safeLive) : null;
+  const line = roadPath && roadPath.length > 1 ? roadPath : coords.length > 1 ? coords : null;
+  // Same highlight as native: casing plus the road ahead. Off the route, `ahead` is the whole line.
+  const route = line && line.length > 1 ? splitRouteProgress(line, safeLive) : null;
+  const offRoute = route?.offRoute ?? false;
+  const roles = stopRoles(safeStops, safeLive, { offRoute });
+  const toNearestStop = pathToNearestStop(line ?? coords, safeLive, coords);
   const glidedLive = useGlidedCoord(safeLive);
 
   // teovilla only forwards onPanDrag for map DRAG, so a scroll-wheel zoom wouldn't drop follow
@@ -95,6 +100,11 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
   }
 
   return (
+    <MapErrorBoundary fallback={() => (
+      <View testID="map-unavailable" style={styles.fallback}>
+        <Text style={styles.fallbackText}>Map unavailable</Text>
+      </View>
+    )}>
     <View ref={containerRef as never} style={styles.container}>
       <MapView
         testID="live-map"
@@ -108,32 +118,39 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
         initialRegion={{ ...initial, latitudeDelta: 0.05, longitudeDelta: 0.05 }}
       >
         {route && route.ahead.length > 1 && (
-          <Polyline coordinates={route.ahead} strokeWidth={11} strokeColor={colors.surface} />
+          <Polyline coordinates={route.ahead} strokeWidth={14} strokeColor="#FFFFFF" />
         )}
         {route && route.traveled.length > 1 && (
-          <Polyline testID="map-polyline-traveled" coordinates={route.traveled} strokeWidth={6} strokeColor={colors.inkFaint} />
+          <Polyline testID="map-polyline-traveled" coordinates={route.traveled} strokeWidth={8} strokeColor={colors.inkFaint} />
         )}
         {route && route.ahead.length > 1 && (
-          <Polyline testID="map-polyline" coordinates={route.ahead} strokeWidth={7} strokeColor={colors.primary} />
+          <Polyline testID="map-polyline" coordinates={route.ahead} strokeWidth={8} strokeColor={colors.primary} />
+        )}
+        {toNearestStop.length > 1 && (
+          <Polyline coordinates={toNearestStop} strokeWidth={14} strokeColor="#FFFFFF" />
+        )}
+        {toNearestStop.length > 1 && (
+          <Polyline testID="map-polyline-to-stop" coordinates={toNearestStop} strokeWidth={8} strokeColor={colors.gold} />
         )}
         {segments.map((seg, i) => (
           <Marker key={`seg-${i}`} testID={`map-segment-${i}`} coordinate={seg.midpoint}>
             <RouteSegmentLabel distanceKm={seg.distanceKm} durationMin={seg.durationMin} />
           </Marker>
         ))}
-        {roles.map(({ stop, role, isDestination }) => (
-          <Marker key={stop.id} testID={`map-stop-${stop.id}`} coordinate={{ latitude: stop.lat, longitude: stop.lng }} title={stop.name}>
-            <StopMarker role={role} isDestination={isDestination} />
+        {roles.map(({ stop, role, isDestination, near }) => (
+          <Marker key={stop.id} testID={`map-stop-${stop.id}`} coordinate={{ latitude: stop.lat, longitude: stop.lng }} title={stop.name} tracksViewChanges>
+            <StopMarker role={role} isDestination={isDestination} near={near} name={stop.name} />
           </Marker>
         ))}
         {glidedLive && (
-          <Marker testID="map-live-marker" coordinate={glidedLive}>
-            <BusMarker headingDeg={glidedLive.headingDeg} />
+          <Marker testID="map-live-marker" coordinate={glidedLive} tracksViewChanges>
+            <BusMarker headingDeg={glidedLive.headingDeg} offRoute={offRoute} />
           </Marker>
         )}
       </MapView>
       {routeGeometry?.status === 'unavailable' && <RouteUnavailableBadge />}
     </View>
+    </MapErrorBoundary>
   );
 });
 LiveMapView.displayName = 'LiveMapView';

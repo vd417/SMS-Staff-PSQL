@@ -48,7 +48,7 @@ export const LeaveScreen = () => {
   return (
     <SafeAreaView style={[styles.fill, { backgroundColor: colors.bg }]}>
       <Text style={[TextScale.screenTitle, styles.title, { color: colors.ink }]}>{t('leave.title')}</Text>
-      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 120 }]}>
+      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 160 }]}>
         {isLoading ? <Skeleton width="100%" height={90} radius={16} />
           : isError ? <ErrorState onRetry={refetch} />
           : (

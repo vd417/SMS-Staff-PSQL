@@ -227,6 +227,17 @@ describe('LiveMapScreen', () => {
     );
   });
 
+  it('opens the stop check on its own once the van is at the next stop', async () => {
+    const { getByTestId } = renderScreen();
+    await waitFor(() => expect(getByTestId('has-live-marker')).toBeTruthy());
+    await act(async () => {
+      mockLoc.emit?.({ coords: { latitude: 12.1002, longitude: 77.1, accuracy: 8, speed: 0 } });
+    });
+    await waitFor(() =>
+      expect(mockAction.mutate).toHaveBeenCalledWith({ kind: 'arrive', stopId: 's1' }, expect.any(Object)),
+    );
+  });
+
   it('EN_ROUTE shows Arrived for the next stop and confirms it on tap', async () => {
     const { findByTestId } = renderScreen();
     fireEvent.press(await findByTestId('arrived-btn'));

@@ -1,4 +1,4 @@
-import { distanceMeters, formatDistance } from '@/lib/geo';
+import { bearingDegrees, distanceMeters, formatDistance } from '@/lib/geo';
 
 describe('distanceMeters', () => {
   it('returns 0 for identical coordinates', () => {
@@ -27,6 +27,14 @@ describe('distanceMeters', () => {
     const a = { lat: 28.4595, lng: 77.0266 };
     const b = { lat: 28.4850, lng: 77.0770 };
     expect(distanceMeters(a, b)).toBeCloseTo(distanceMeters(b, a), 6);
+  });
+});
+
+describe('bearingDegrees', () => {
+  it('points north, east, and wraps to 0–360', () => {
+    expect(bearingDegrees({ lat: 0, lng: 0 }, { lat: 1, lng: 0 })).toBeCloseTo(0, 5);
+    expect(bearingDegrees({ lat: 0, lng: 0 }, { lat: 0, lng: 1 })).toBeCloseTo(90, 5);
+    expect(bearingDegrees({ lat: 1, lng: 0 }, { lat: 0, lng: 0 })).toBeCloseTo(180, 5);
   });
 });
 

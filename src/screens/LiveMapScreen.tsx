@@ -16,20 +16,32 @@ import { nextFollowCamera, FOLLOW_DEFAULT_ZOOM, type CameraState } from '@/featu
 import { routeStripFor, type StopAction } from '@/features/trip/stopProgress';
 import { LiveMapView } from '@/features/map/LiveMapView';
 import { toMapCoords } from '@/features/map/toMapCoords';
-import { distanceMeters } from '@/lib/geo';
+import { bearingDegrees, distanceMeters } from '@/lib/geo';
 import type { LiveMapHandle } from '@/features/map/liveMapTypes';
 import type { BoardingState } from '@/data/domain';
 
 type LiveMarker = { latitude: number; longitude: number; headingDeg?: number; speedKmh?: number; accuracyM?: number };
-type GpsStatus = 'live' | 'delayed' | 'offline';
+type GpsStatus = 'live' | 'delayed' | 'offline' | 'locating';
+
+/** Close enough to a stop to open the check page without a manual Arrived tap. */
+const AUTO_ARRIVE_METERS = 120;
 
 const NEXT: Record<BoardingState, BoardingState> = { boarded: 'dropped', dropped: 'absent', absent: 'boarded' };
 
 function gpsStatusFor(secondsSinceUpdate: number | null): GpsStatus {
-  if (secondsSinceUpdate == null) return 'offline';
-  if (secondsSinceUpdate <= 15) return 'live';
-  if (secondsSinceUpdate <= 60) return 'delayed';
-  return 'offline';
+  // Pickup keeps the van live from the first fix until the driver leaves this screen.
+  if (secondsSinceUpdate == null) return 'locating';
+  return 'live';
+}
+
+function applyFix(loc: Location.LocationObject): LiveMarker {
+  return {
+    latitude: loc.coords.latitude,
+    longitude: loc.coords.longitude,
+    headingDeg: loc.coords.heading != null && loc.coords.heading >= 0 ? loc.coords.heading : undefined,
+    speedKmh: loc.coords.speed != null && loc.coords.speed >= 0 ? Math.round(loc.coords.speed * 3.6) : undefined,
+    accuracyM: loc.coords.accuracy != null ? Math.round(loc.coords.accuracy) : undefined,
+  };
 }
 
 export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: { params: { tripId: string } } }) => {
@@ -51,6 +63,7 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
   const mapRef = useRef<LiveMapHandle>(null);
   const hasFitRef = useRef(false);
   const hasCenteredRef = useRef(false);
+  const autoArriveRef = useRef<{ stopId: string; at: number } | null>(null);
   // Follow mode: camera tracks the driver (bearing + tilt) until the driver pans
   // the map by hand; the Re-center button turns it back on. camStateRef carries
   // the last applied bearing/zoom so transitions ease instead of jumping — kept in
@@ -92,21 +105,21 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
         toast.show(t('trip.locationDenied'), 'error');
         return;
       }
+      const onFix = (loc: Location.LocationObject) => {
+        if (cancelled) return;
+        setLiveMarker(applyFix(loc));
+        setLastPingAt(Date.now());
+      };
+      // One-shot so the van, zoom, and LIVE pill appear at pickup even before the van moves.
+      if (typeof Location.getCurrentPositionAsync === 'function') {
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })
+          .then(onFix)
+          .catch(() => {});
+      }
       try {
         const sub = await Location.watchPositionAsync(
-          { accuracy: Location.Accuracy.Balanced, timeInterval: 5000, distanceInterval: 10 },
-          (loc) => {
-            if (!cancelled) {
-              setLiveMarker({
-                latitude: loc.coords.latitude,
-                longitude: loc.coords.longitude,
-                headingDeg: loc.coords.heading != null && loc.coords.heading >= 0 ? loc.coords.heading : undefined,
-                speedKmh: loc.coords.speed != null && loc.coords.speed >= 0 ? Math.round(loc.coords.speed * 3.6) : undefined,
-                accuracyM: loc.coords.accuracy != null ? Math.round(loc.coords.accuracy) : undefined,
-              });
-              setLastPingAt(Date.now());
-            }
-          }
+          { accuracy: Location.Accuracy.High, timeInterval: 4000, distanceInterval: 0 },
+          onFix
         );
         if (cancelled) {
           safeRemove(sub);
@@ -127,9 +140,9 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
 
   const secondsSinceUpdate = lastPingAt != null ? Math.max(0, Math.floor((now - lastPingAt) / 1000)) : null;
   const gpsStatus = gpsStatusFor(secondsSinceUpdate);
-  const statusColor = gpsStatus === 'live' ? colors.success : gpsStatus === 'delayed' ? colors.warn : colors.danger;
-  const statusBg = gpsStatus === 'live' ? colors.successSoft : gpsStatus === 'delayed' ? colors.warnSoft : colors.dangerSoft;
-  const statusLabel = t(`trip.${gpsStatus === 'live' ? 'live' : gpsStatus}`);
+  const statusColor = gpsStatus === 'live' ? colors.success : gpsStatus === 'delayed' ? colors.warn : gpsStatus === 'locating' ? colors.inkSoft : colors.danger;
+  const statusBg = gpsStatus === 'live' ? colors.successSoft : gpsStatus === 'delayed' ? colors.warnSoft : gpsStatus === 'locating' ? colors.sunken : colors.dangerSoft;
+  const statusLabel = t(`trip.${gpsStatus}`);
 
   const stops = useMemo(() => assignment.data?.route.stops ?? [], [assignment.data]);
   const progress = useStopProgress(stops, tripStops.data, roster.data ?? [], boarding.data ?? []);
@@ -151,6 +164,27 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
         : t('trip.distanceM', { m: Math.round(distanceM) });
   const etaMin =
     distanceM != null && liveMarker?.speedKmh ? Math.round(distanceM / 1000 / liveMarker.speedKmh * 60) : null;
+
+  const routeBearing = useMemo(() => {
+    if (!liveMarker || !activeStop) return undefined;
+    return bearingDegrees(
+      { lat: liveMarker.latitude, lng: liveMarker.longitude },
+      { lat: activeStop.lat, lng: activeStop.lng },
+    );
+  }, [liveMarker, activeStop]);
+
+  const cameraFix = useMemo(
+    () => (liveMarker ? { ...liveMarker, routeHeadingDeg: routeBearing } : null),
+    [liveMarker, routeBearing],
+  );
+
+  // Point the van at the route while GPS heading is unreliable (stopped at pickup).
+  const pointedMarker = useMemo(() => {
+    if (!liveMarker) return null;
+    const moving = (liveMarker.speedKmh ?? 0) >= 5 && liveMarker.headingDeg != null;
+    if (moving || routeBearing == null) return liveMarker;
+    return { ...liveMarker, headingDeg: routeBearing };
+  }, [liveMarker, routeBearing]);
 
   const stateFor = (studentId: string): BoardingState =>
     boarding.data?.find((b) => b.studentId === studentId)?.state ?? 'absent';
@@ -175,19 +209,23 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
   // inaccurate for the smooth follow camera — so we never stay zoomed out on all
   // the stops once we know where the driver is.
   useEffect(() => {
-    if (!followMode || !mapReady || !liveMarker) return;
-    const next = nextFollowCamera(camStateRef.current, liveMarker);
+    if (!followMode || !mapReady || !liveMarker || !cameraFix) return;
+    // First lock aims straight down the route instead of easing in from north.
+    if (!hasCenteredRef.current && routeBearing != null) {
+      camStateRef.current = { ...camStateRef.current, heading: routeBearing };
+    }
+    const next = nextFollowCamera(camStateRef.current, cameraFix);
     if (next) {
       camStateRef.current = next.state;
       mapRef.current?.animateCamera(next.camera, { duration: 500 });
     } else if (!hasCenteredRef.current) {
       mapRef.current?.animateToRegion(
-        { latitude: liveMarker.latitude, longitude: liveMarker.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 },
+        { latitude: liveMarker.latitude, longitude: liveMarker.longitude, latitudeDelta: 0.005, longitudeDelta: 0.005 },
         500
       );
     }
     hasCenteredRef.current = true;
-  }, [liveMarker, followMode, mapReady]);
+  }, [liveMarker, cameraFix, routeBearing, followMode, mapReady]);
 
   // The driver dragged/zoomed the map by hand — stop auto-following until they
   // tap Re-center.
@@ -196,13 +234,16 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
   const onRecenter = () => {
     if (!liveMarker || !mapReady) return;
     setFollowMode(true);
-    const next = nextFollowCamera(camStateRef.current, liveMarker);
+    if (routeBearing != null) {
+      camStateRef.current = { ...camStateRef.current, heading: routeBearing };
+    }
+    const next = nextFollowCamera(camStateRef.current, cameraFix ?? liveMarker);
     if (next) {
       camStateRef.current = next.state;
       mapRef.current?.animateCamera(next.camera, { duration: 500 });
     } else {
       mapRef.current?.animateToRegion(
-        { latitude: liveMarker.latitude, longitude: liveMarker.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 },
+        { latitude: liveMarker.latitude, longitude: liveMarker.longitude, latitudeDelta: 0.005, longitudeDelta: 0.005 },
         500
       );
     }
@@ -215,6 +256,19 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
       onError: (e) => setStopError(stopActionMessage(e, t)),
     });
   };
+
+  // Reaching a stop opens the student check on its own. A rejection (too far) can retry.
+  useEffect(() => {
+    if (progress.state !== 'EN_ROUTE' || !activeStop || distanceM == null || distanceM > AUTO_ARRIVE_METERS) return;
+    if (stopAction.isPending) return;
+    const prev = autoArriveRef.current;
+    if (prev && prev.stopId === activeStop.id && Date.now() - prev.at < 20_000) return;
+    autoArriveRef.current = { stopId: activeStop.id, at: Date.now() };
+    setShowStudents(true);
+    runStopAction({ kind: 'arrive', stopId: activeStop.id });
+    // runStopAction closes over the latest mutate; distance and stop identity are the triggers.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progress.state, activeStop, distanceM, stopAction.isPending]);
 
   const onMarkPickedUp = () => {
     if (!activeStop) return;
@@ -252,7 +306,7 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
         ) : assignment.isError ? (
           <ErrorState onRetry={assignment.refetch} />
         ) : (
-          <LiveMapView ref={mapRef} stops={stops} liveMarker={liveMarker} onMapReady={() => setMapReady(true)} routeGeometry={geometry.data} onUserPan={onUserPan} />
+          <LiveMapView ref={mapRef} stops={stops} liveMarker={pointedMarker} onMapReady={() => setMapReady(true)} routeGeometry={geometry.data} onUserPan={onUserPan} />
         )}
       </View>
 

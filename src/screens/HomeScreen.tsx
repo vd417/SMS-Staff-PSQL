@@ -1,5 +1,5 @@
 // src/screens/HomeScreen.tsx
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -24,6 +24,12 @@ import {
   type QuickAction,
 } from '@/components/ui';
 import { ErrorState } from '@/components/state';
+import type { RoleCard } from '@/data/domain';
+
+function shiftTiming(card: RoleCard | null): string {
+  if (card?.kind === 'driver' || card?.kind === 'conductor') return card.shift ?? '';
+  return '';
+}
 
 export const HomeScreen = ({ navigation }: { navigation: any }) => {
   const { t } = useTranslation();
@@ -32,6 +38,14 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
   const { session } = useAuth();
   const { data: d, isLoading, isError, refetch } = useDashboard();
   const att = useAttendanceStatus();
+  const refetchAttendance = att.refetch;
+  useEffect(() => {
+    if (typeof navigation.addListener !== 'function') return;
+    return navigation.addListener('focus', () => {
+      void refetchAttendance?.();
+      void refetch();
+    });
+  }, [navigation, refetch, refetchAttendance]);
   const attachTaskPhoto = useAttachTaskPhoto();
   const notifUnread = useInboxUnread();
   const toast = useToast();
@@ -103,7 +117,7 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
 
   return (
     <SafeAreaView style={[styles.fill, { backgroundColor: colors.bg }]}>
-      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 120 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 160 }]} showsVerticalScrollIndicator={false}>
         <Header
           schoolName={session.tenant.name}
           firstName={session.user.firstName}
@@ -113,11 +127,12 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
           onPressBell={() => navigation.navigate('Notifications')}
           notifications={notifUnread}
         />
+        <View style={styles.stack}>
         <Animated.View entering={FadeInDown.delay(0).duration(300)}>
           <HeroTodayCard
-            timing={session.user.timing}
+            timing={session.user.timing || shiftTiming(d.roleCard)}
             dutyPostLabel={t('home.dutyPostLabel')}
-            dutyPost={session.user.dutyPost}
+            dutyPost={att.data?.dutyPost || session.user.dutyPost}
             checkedIn={att.data?.checkedIn ?? false}
             checkInAt={att.data?.checkInAt}
             onPressCheckIn={openAttendance}
@@ -151,6 +166,7 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
             <AlertCard message={d.alert} />
           </Animated.View>
         )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -161,6 +177,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    gap: 12,
+  },
+  stack: {
+    paddingHorizontal: 16,
     gap: 12,
   },
   skeletonContainer: {

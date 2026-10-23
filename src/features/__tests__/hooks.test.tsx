@@ -47,7 +47,7 @@ function AttendanceProbe() {
       <Text testID="checked">{String(data?.checkedIn ?? '')}</Text>
       <Pressable
         testID="checkin"
-        onPress={() => checkIn.mutate({ at: '2026-06-03T08:00:00Z', lat: 28.4595, lng: 77.0266, accuracyMeters: 8 })}
+        onPress={() => checkIn.mutate({ at: new Date().toISOString(), lat: 28.4595, lng: 77.0266, accuracyMeters: 8 })}
       >
         <Text>in</Text>
       </Pressable>
@@ -71,5 +71,29 @@ describe('feature hooks', () => {
     await waitFor(() => expect(screen.getByTestId('checked')).toHaveTextContent('false'));
     fireEvent.press(screen.getByTestId('checkin'));
     await waitFor(() => expect(screen.getByTestId('checked')).toHaveTextContent('true'));
+  });
+
+  it('keeps the home status checked in when the server drops the punch', async () => {
+    const repos = createMockRepositories(await createStore());
+    const dropped = { checkedIn: false, lastLog: [], dutyPost: 'Transport', geofenceRadiusM: 80 };
+    const status = jest.fn(async () => dropped);
+    repos.attendance = {
+      ...repos.attendance,
+      status,
+      checkIn: jest.fn(async () => dropped),
+    };
+    qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <RepositoryProvider repositories={repos}>
+          <AttendanceProbe />
+        </RepositoryProvider>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('checked')).toHaveTextContent('false'));
+    const before = status.mock.calls.length;
+    fireEvent.press(screen.getByTestId('checkin'));
+    await waitFor(() => expect(status.mock.calls.length).toBeGreaterThan(before));
+    expect(screen.getByTestId('checked')).toHaveTextContent('true');
   });
 });

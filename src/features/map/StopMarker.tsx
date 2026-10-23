@@ -1,12 +1,15 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '@/theme';
-import { Icon } from '@/components/icons';
 import type { StopRole } from './stopRoles';
 
 export interface StopMarkerProps {
   role: StopRole;
   isDestination: boolean;
+  /** Place name for this stop, shown on the map. */
+  name: string;
+  /** Pale ring used when the van is off the route and this stop is nearby. */
+  near?: boolean;
 }
 
 const shadow = {
@@ -17,77 +20,72 @@ const shadow = {
   elevation: 3,
 } as const;
 
-export const StopMarker: React.FC<StopMarkerProps> = ({ role, isDestination }) => {
+const NEAR_HALO = '#CDE7DF';
+const NEAR_FILL = '#E8F7F2';
+
+export const StopMarker: React.FC<StopMarkerProps> = ({ role, isDestination, name, near }) => {
   const { colors } = useTheme();
+  const pinColor = near
+    ? NEAR_FILL
+    : isDestination
+      ? colors.gold
+      : role === 'completed'
+        ? colors.inkFaint
+        : role === 'current'
+          ? colors.primary
+          : colors.surface;
+  const pinBorder = near || role === 'next' || role === 'current' ? colors.primary : isDestination ? colors.surface : colors.inkFaint;
+  const roleId = near
+    ? undefined
+    : isDestination
+      ? 'stop-marker-destination'
+      : role === 'completed'
+        ? 'stop-marker-completed'
+        : role === 'current'
+          ? 'stop-marker-current'
+          : role === 'next'
+            ? 'stop-marker-next'
+            : 'stop-marker-upcoming';
 
-  if (isDestination) {
-    return (
-      <View testID="stop-marker-destination" style={[styles.destination, shadow, { backgroundColor: colors.gold, borderColor: colors.surface }]}>
-        <Icon name="home" size={16} color="#FFFFFF" strokeWidth={2} />
+  return (
+    <View testID={near ? 'stop-marker-near' : roleId} style={styles.col}>
+      {near && <View style={[styles.nearHalo, { backgroundColor: NEAR_HALO }]} />}
+      <View
+        testID={near && isDestination ? 'stop-marker-destination' : undefined}
+        style={[styles.pin, shadow, { backgroundColor: pinColor, borderColor: pinBorder }]}
+      />
+      <View style={[styles.label, shadow, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+        <Text testID="stop-marker-name" numberOfLines={2} style={[styles.name, { color: colors.ink }]}>
+          {name}
+        </Text>
       </View>
-    );
-  }
-
-  if (role === 'completed') {
-    return (
-      <View testID="stop-marker-completed" style={[styles.small, shadow, { backgroundColor: colors.inkFaint, borderColor: colors.surface }]}>
-        <Icon name="check" size={10} color="#FFFFFF" strokeWidth={3} />
-      </View>
-    );
-  }
-
-  if (role === 'current') {
-    // Pulse ring + solid core so the active stop reads at a glance, Uber-style.
-    return (
-      <View testID="stop-marker-current" style={styles.currentWrap}>
-        <View style={[styles.currentPulse, { backgroundColor: colors.primary }]} />
-        <View style={[styles.large, shadow, { backgroundColor: colors.primary, borderColor: colors.surface }]} />
-      </View>
-    );
-  }
-
-  if (role === 'next') {
-    return <View testID="stop-marker-next" style={[styles.medium, shadow, { backgroundColor: colors.surface, borderColor: colors.primary }]} />;
-  }
-
-  return <View testID="stop-marker-upcoming" style={[styles.dot, shadow, { backgroundColor: colors.surface, borderColor: colors.inkFaint }]} />;
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
-  destination: {
+  col: { alignItems: 'center', maxWidth: 148 },
+  pin: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 3,
+    zIndex: 1,
+  },
+  nearHalo: {
+    position: 'absolute',
+    top: -8,
     width: 32,
     height: 32,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2.5,
+    borderRadius: 16,
   },
-  currentWrap: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  currentPulse: { position: 'absolute', width: 36, height: 36, borderRadius: 18, opacity: 0.2 },
-  large: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 3,
+  label: {
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    maxWidth: 148,
   },
-  medium: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 3,
-  },
-  small: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-  },
-  dot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 2,
-  },
+  name: { fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 15 },
 });
