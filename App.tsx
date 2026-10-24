@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator, Pressable, Text, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, Platform, Pressable, Text, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -65,6 +65,11 @@ export default function App() {
       .catch(() => setI18nReady(true));
   }, []);
 
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    document.body.style.backgroundColor = '#126954';
+  }, []);
+
   // A font-load failure should degrade to system fonts, not hang forever.
   const ready = (fontsLoaded || !!fontError) && i18nReady;
   if (!ready) {
@@ -78,14 +83,18 @@ export default function App() {
   return (
     <AppErrorBoundary>
       <GestureHandlerRootView style={styles.flex}>
-        <SafeAreaProvider>
-          <AppProviders>
-            <NavigationContainer>
-              <StatusBar style="auto" />
-              <RootNavigator />
-            </NavigationContainer>
-          </AppProviders>
-        </SafeAreaProvider>
+        <View style={Platform.OS === 'web' ? styles.webOuter : styles.flex}>
+          <View style={Platform.OS === 'web' ? styles.webColumn : styles.flex}>
+            <SafeAreaProvider>
+              <AppProviders>
+                <NavigationContainer>
+                  <StatusBar style="auto" />
+                  <RootNavigator />
+                </NavigationContainer>
+              </AppProviders>
+            </SafeAreaProvider>
+          </View>
+        </View>
       </GestureHandlerRootView>
     </AppErrorBoundary>
   );
@@ -93,6 +102,19 @@ export default function App() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  webOuter: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+    backgroundColor: '#126954',
+  },
+  webColumn: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 440,
+    backgroundColor: '#F2EEE4',
+    overflow: 'hidden',
+  },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F2EEE4', padding: 24, gap: 8 },
   offlineTitle: { fontSize: 20, fontWeight: '700', color: '#1A2E26' },
   offlineBody: { fontSize: 14, color: '#4E6158', textAlign: 'center' },

@@ -30,7 +30,7 @@ export interface FollowCamera {
 const MIN_SPEED_FOR_HEADING_KMH = 5;
 // Ignore fixes worse than this for the camera so a bad GPS lock can't yank the view.
 const MAX_ACCURACY_M = 50;
-const PITCH_DEG = 45;
+const PITCH_DEG = 65;
 const ZOOM_SLOW = 18;
 const ZOOM_FAST = 16;
 const SPEED_SLOW_KMH = 5;
@@ -90,4 +90,4 @@ export function nextFollowCamera(
   };
 }
 
-export const FOLLOW_DEFAULT_ZOOM = 17;
+export const FOLLOW_DEFAULT_ZOOM = 18;

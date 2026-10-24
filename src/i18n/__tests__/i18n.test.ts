@@ -29,6 +29,11 @@ describe('i18n', () => {
 
   it('translates a key in English', () => {
     expect(i18n.t('role.driver')).toBe('Bus Driver');
+    expect(i18n.t('profile.employeeId')).toBe('Employee ID');
+    expect(i18n.t('profile.joined')).toBe('Joined');
+    expect(i18n.t('profile.emptyDocuments')).toBe('No documents on file yet');
+    expect(i18n.t('profile.light')).toBe('Light');
+    expect(i18n.t('profile.dark')).toBe('Dark');
   });
 
   it('interpolates variables', () => {

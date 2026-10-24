@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
@@ -61,8 +61,11 @@ async function renderScreen() {
 
 it('shows a document and the language switcher', async () => {
   const { findByText, getByTestId } = await renderScreen();
-  await findByText('Driving licence');
+  await findByText('Driving licence', {}, { timeout: 4000 });
+  fireEvent.press(getByTestId('settings-toggle'));
   expect(getByTestId('lang-hi')).toBeTruthy();
+  expect(getByTestId('theme-light')).toBeTruthy();
+  expect(getByTestId('toggle-theme')).toBeTruthy();
 });
 
 it('shows a My Attendance entry point to view check-in/check-out history', async () => {

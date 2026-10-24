@@ -31,8 +31,26 @@ export interface RouteSplit {
  * Off the route, the whole line stays ahead so the map draws one route line and does not dim a
  * random stretch. With no fix (or a degenerate path) the whole route is ahead.
  */
-export function splitRouteProgress(path: MapCoord[], bus: MapCoord | null): RouteSplit {
-  if (!bus || path.length < 2) return { traveled: [], ahead: path, offRoute: false };
+export interface PathHit {
+  point: MapCoord;
+  meters: number;
+  /** Segment index whose span contains `point`. */
+  index: number;
+}
+
+/** Closest point on a polyline, in metres from `bus`. */
+export function closestOnPath(path: MapCoord[], bus: MapCoord): PathHit | null {
+  if (path.length === 0) return null;
+  if (path.length === 1) {
+    return {
+      point: path[0],
+      meters: distanceMeters(
+        { lat: bus.latitude, lng: bus.longitude },
+        { lat: path[0].latitude, lng: path[0].longitude },
+      ),
+      index: 0,
+    };
+  }
 
   const lat0 = bus.latitude;
   const p = xy(bus, lat0);
@@ -61,7 +79,70 @@ export function splitRouteProgress(path: MapCoord[], bus: MapCoord | null): Rout
     }
   }
 
-  if (best > ON_ROUTE_METERS) return { traveled: [], ahead: path, offRoute: true };
+  return { point: bestPoint, meters: best, index: bestIdx };
+}
+
+/** Hide the join guide once the van is already on the line. */
+export const GUIDE_HIDE_METERS = 30;
+
+/**
+ * Straight guide from the van to the nearest point on the route.
+ * Empty when there is no fix, no line, or the van is already on the path.
+ */
+export function guideToPath(path: MapCoord[], bus: MapCoord | null): MapCoord[] {
+  if (!bus || path.length < 2) return [];
+  const hit = closestOnPath(path, bus);
+  if (!hit || hit.meters < GUIDE_HIDE_METERS) return [];
+  return [bus, hit.point];
+}
+
+function lerp(a: MapCoord, b: MapCoord, t: number): MapCoord {
+  return {
+    latitude: a.latitude + (b.latitude - a.latitude) * t,
+    longitude: a.longitude + (b.longitude - a.longitude) * t,
+  };
+}
+
+/**
+ * Break a straight guide into short dashes so the hint stays dotted on web,
+ * where the map polyline cannot draw a dash pattern.
+ */
+export function guideDashes(line: MapCoord[], dashM = 10, gapM = 14, maxDashes = 28): MapCoord[][] {
+  if (line.length < 2) return [];
+  const a = line[0];
+  const b = line[line.length - 1];
+  const total = distanceMeters(
+    { lat: a.latitude, lng: a.longitude },
+    { lat: b.latitude, lng: b.longitude },
+  );
+  if (total < 8) return [];
+  const pair = dashM + gapM;
+  let dash = dashM;
+  let gap = gapM;
+  let count = Math.max(1, Math.floor(total / pair));
+  if (count > maxDashes) {
+    const scaled = total / maxDashes;
+    dash = scaled * (dashM / pair);
+    gap = scaled * (gapM / pair);
+    count = maxDashes;
+  }
+  const out: MapCoord[][] = [];
+  for (let i = 0; i < count; i++) {
+    const startM = i * (dash + gap);
+    const endM = Math.min(startM + dash, total);
+    if (endM <= startM) break;
+    out.push([lerp(a, b, startM / total), lerp(a, b, endM / total)]);
+  }
+  return out;
+}
+
+export function splitRouteProgress(path: MapCoord[], bus: MapCoord | null): RouteSplit {
+  if (!bus || path.length < 2) return { traveled: [], ahead: path, offRoute: false };
+
+  const hit = closestOnPath(path, bus);
+  if (!hit || hit.meters > ON_ROUTE_METERS) return { traveled: [], ahead: path, offRoute: true };
+  const bestIdx = hit.index;
+  const bestPoint = hit.point;
 
   const segStart = path[bestIdx];
   const segEnd = path[bestIdx + 1];

@@ -75,6 +75,7 @@ describe('LiveMapView (web)', () => {
     renderWithTheme(<LiveMapView stops={stops} liveMarker={null} />);
     expect(mockMapViewProps).toHaveLength(1);
     expect(mockMapViewProps[0].googleMapsMapId).toBe('test-map-id');
+    expect(mockMapViewProps[0].options.mapId).toBe('test-map-id');
   });
 
   it('highlights the nearest stop as the destination and marks earlier stops completed', () => {
@@ -136,13 +137,14 @@ describe('LiveMapView (web)', () => {
 
   it('shows the bus icon and a light highlight on each nearby stop when the van is off the route', () => {
     process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY = 'test-key';
-    const { getByTestId } = renderWithTheme(
+    const { getByTestId, getAllByTestId } = renderWithTheme(
       <LiveMapView stops={stops} liveMarker={{ latitude: 12.1, longitude: 77.098 }} />,
     );
     expect(within(getByTestId('map-live-marker')).getByTestId('bus-marker')).toBeTruthy();
     expect(within(getByTestId('map-stop-s1')).getByTestId('stop-marker-near')).toBeTruthy();
     expect(getByTestId('map-stop-s1')).toHaveTextContent('Gate');
-    expect(getByTestId('map-polyline-to-stop')).toBeTruthy();
+    expect(getAllByTestId('map-guide-to-path').length).toBeGreaterThan(0);
+    expect(getByTestId('map-guide-cursor')).toBeTruthy();
     expect(within(getByTestId('map-stop-s2')).queryByTestId('stop-marker-near')).toBeNull();
   });
 });

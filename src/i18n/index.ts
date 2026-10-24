@@ -25,6 +25,16 @@ function isSupported(code: string | null): code is LanguageCode {
 
 let initPromise: Promise<void> | null = null;
 
+const resources = { en, hi, mr, ta } as const;
+
+/** Push the JSON catalogs into i18next. Fast refresh keeps the i18next singleton,
+ *  so a later edit to these files must overwrite the bundle or new keys show up raw. */
+function publishResources(): void {
+  (Object.entries(resources) as [LanguageCode, object][]).forEach(([lng, bundle]) => {
+    i18next.addResourceBundle(lng, 'translation', bundle, true, true);
+  });
+}
+
 async function doInit(): Promise<void> {
   const saved = await asyncStore.get<string>(LANG_KEY);
   const lng: LanguageCode = isSupported(saved) ? saved : 'en';
@@ -41,13 +51,19 @@ async function doInit(): Promise<void> {
     returnNull: false,
     parseMissingKeyHandler: (key) => key,
   });
+  publishResources();
 }
 
 export function initI18n(): Promise<void> {
-  if (i18next.isInitialized) return Promise.resolve();
+  if (i18next.isInitialized) {
+    publishResources();
+    return Promise.resolve();
+  }
   if (!initPromise) initPromise = doInit();
   return initPromise;
 }
+
+if (i18next.isInitialized) publishResources();
 
 export async function setLanguage(code: LanguageCode): Promise<void> {
   // Persist first so a failed write never leaves UI and storage out of sync.

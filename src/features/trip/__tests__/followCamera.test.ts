@@ -42,7 +42,7 @@ describe('nextFollowCamera', () => {
     const r = nextFollowCamera(base, { latitude: 1, longitude: 2, headingDeg: 90, speedKmh: 30, accuracyM: 10 });
     expect(r).not.toBeNull();
     expect(r!.camera.center).toEqual({ latitude: 1, longitude: 2 });
-    expect(r!.camera.pitch).toBeGreaterThan(0);
+    expect(r!.camera.pitch).toBeGreaterThan(45);
   });
   it('freezes the bearing at very low speed', () => {
     const r = nextFollowCamera({ heading: 42, zoom: 17 }, { latitude: 1, longitude: 2, headingDeg: 200, speedKmh: 1, accuracyM: 5 });

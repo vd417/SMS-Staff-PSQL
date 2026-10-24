@@ -12,7 +12,8 @@ import { RouteUnavailableBadge } from './RouteUnavailableBadge';
 import { MapErrorBoundary } from './MapErrorBoundary';
 import { stopRoles } from './stopRoles';
 import { routeSegments } from './routeSegments';
-import { pathToNearestStop, splitRouteProgress } from './routeProgress';
+import { guideDashes, guideToPath, splitRouteProgress } from './routeProgress';
+import { GuideCursor } from './GuideCursor';
 import { useGlidedCoord } from './useGlidedCoord';
 import type { LiveMapViewProps, LiveMapHandle } from './liveMapTypes';
 
@@ -77,7 +78,8 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
   const route = line && line.length > 1 ? splitRouteProgress(line, safeLive) : null;
   const offRoute = route?.offRoute ?? false;
   const roles = stopRoles(safeStops, safeLive, { offRoute });
-  const toNearestStop = pathToNearestStop(line ?? coords, safeLive, coords);
+  const guide = guideToPath(line ?? coords, safeLive);
+  const guideDots = guideDashes(guide);
   const glidedLive = useGlidedCoord(safeLive);
 
   // teovilla only forwards onPanDrag for map DRAG, so a scroll-wheel zoom wouldn't drop follow
@@ -113,24 +115,30 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
         style={styles.map}
         googleMapsApiKey={apiKey}
         googleMapsMapId={mapId}
+        options={mapId ? { mapId } : undefined}
         onMapReady={onMapReady}
         onPanDrag={onUserPan}
         initialRegion={{ ...initial, latitudeDelta: 0.05, longitudeDelta: 0.05 }}
       >
-        {route && route.ahead.length > 1 && (
-          <Polyline coordinates={route.ahead} strokeWidth={14} strokeColor="#FFFFFF" />
+        {line && line.length > 1 && (
+          <Polyline coordinates={line} strokeWidth={16} strokeColor="#FFFFFF" />
+        )}
+        {line && line.length > 1 && (
+          <Polyline testID="map-polyline" coordinates={line} strokeWidth={9} strokeColor={colors.primary} />
         )}
         {route && route.traveled.length > 1 && (
-          <Polyline testID="map-polyline-traveled" coordinates={route.traveled} strokeWidth={8} strokeColor={colors.inkFaint} />
+          <Polyline testID="map-polyline-traveled" coordinates={route.traveled} strokeWidth={9} strokeColor={colors.primaryDim} />
         )}
-        {route && route.ahead.length > 1 && (
-          <Polyline testID="map-polyline" coordinates={route.ahead} strokeWidth={8} strokeColor={colors.primary} />
-        )}
-        {toNearestStop.length > 1 && (
-          <Polyline coordinates={toNearestStop} strokeWidth={14} strokeColor="#FFFFFF" />
-        )}
-        {toNearestStop.length > 1 && (
-          <Polyline testID="map-polyline-to-stop" coordinates={toNearestStop} strokeWidth={8} strokeColor={colors.gold} />
+        {guideDots.map((seg, i) => (
+          <Polyline key={`guide-casing-${i}`} coordinates={seg} strokeWidth={8} strokeColor="#FFFFFF" />
+        ))}
+        {guideDots.map((seg, i) => (
+          <Polyline key={`guide-${i}`} testID="map-guide-to-path" coordinates={seg} strokeWidth={5} strokeColor="#7ECFC0" />
+        ))}
+        {guide.length > 1 && (
+          <Marker coordinate={guide[guide.length - 1]} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges>
+            <GuideCursor />
+          </Marker>
         )}
         {segments.map((seg, i) => (
           <Marker key={`seg-${i}`} testID={`map-segment-${i}`} coordinate={seg.midpoint}>
@@ -143,7 +151,7 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
           </Marker>
         ))}
         {glidedLive && (
-          <Marker testID="map-live-marker" coordinate={glidedLive} tracksViewChanges>
+          <Marker testID="map-live-marker" coordinate={glidedLive} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges>
             <BusMarker headingDeg={glidedLive.headingDeg} offRoute={offRoute} />
           </Marker>
         )}

@@ -29,15 +29,23 @@ jest.mock('expo-location', () => ({
   hasStartedLocationUpdatesAsync: jest.fn(async () => false),
   stopLocationUpdatesAsync: jest.fn(async () => {}),
   watchPositionAsync: (...args: unknown[]) => mockWatchPositionAsync(args[0], args[1] as never),
+  getCurrentPositionAsync: jest.fn(async () => {
+    throw new Error('no fix');
+  }),
   Accuracy: { High: 6 },
   ActivityType: { Other: 1, AutomotiveNavigation: 2 },
 }));
 
 beforeEach(async () => {
   const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+  const Location = jest.requireMock('expo-location');
   await AsyncStorage.clear();
   mockRemove.mockClear();
   mockWatchPositionAsync.mockClear();
+  Location.getCurrentPositionAsync.mockReset();
+  Location.getCurrentPositionAsync.mockImplementation(async () => {
+    throw new Error('no fix');
+  });
 });
 
 describe('startBroadcast', () => {
@@ -119,6 +127,62 @@ describe('startBroadcast', () => {
       expect.objectContaining({ activityType: Location.ActivityType.AutomotiveNavigation }),
     );
     await stopBroadcast();
+  });
+
+  it('keeps publishing a stopped van on pickup or drop until the trip ends', async () => {
+    const Location = jest.requireMock('expo-location');
+    let now = 1_700_000_000_000;
+    const nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => now);
+    Location.getCurrentPositionAsync.mockImplementation(async () => ({
+      coords: { latitude: 12.9, longitude: 77.6, speed: 0, heading: 90, accuracy: 5 },
+      timestamp: now,
+    }));
+    const ticks: Array<() => void> = [];
+    const intervalSpy = jest.spyOn(global, 'setInterval').mockImplementation((fn: any) => {
+      ticks.push(fn);
+      return 1 as unknown as ReturnType<typeof setInterval>;
+    });
+    const flush = async () => {
+      await new Promise((r) => setTimeout(r, 0));
+      for (let i = 0; i < 20; i += 1) await Promise.resolve();
+    };
+    try {
+      const onPings = jest.fn(async () => {});
+      await startBroadcast({ tripId: 't1', onPings });
+      await flush();
+      expect(onPings).toHaveBeenCalledWith('t1', [expect.objectContaining({ lat: 12.9, lng: 77.6, speedKmh: 0 })]);
+      const afterStart = onPings.mock.calls.length;
+
+      now += 15_000;
+      ticks[0]?.();
+      await flush();
+      expect(onPings.mock.calls.length).toBeGreaterThan(afterStart);
+
+      Location.getCurrentPositionAsync.mockImplementationOnce(async () => {
+        throw new Error('gps unavailable');
+      });
+      now += 15_000;
+      const beforeMiss = onPings.mock.calls.length;
+      ticks[0]?.();
+      await flush();
+      expect(onPings.mock.calls.length).toBeGreaterThan(beforeMiss);
+
+      await stopBroadcast();
+      const stopped = onPings.mock.calls.length;
+      now += 15_000;
+      ticks[0]?.();
+      await flush();
+      expect(onPings.mock.calls.length).toBe(stopped);
+      expect(isBroadcasting()).toBe(false);
+    } finally {
+      nowSpy.mockRestore();
+      intervalSpy.mockRestore();
+      Location.getCurrentPositionAsync.mockReset();
+      Location.getCurrentPositionAsync.mockImplementation(async () => {
+        throw new Error('no fix');
+      });
+      await stopBroadcast();
+    }
   });
 
   it('single-flights concurrent startBroadcast calls so a second resume effect cannot leak a watcher', async () => {

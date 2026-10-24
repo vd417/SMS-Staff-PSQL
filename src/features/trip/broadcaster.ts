@@ -16,7 +16,10 @@ const MIN_METERS = 50;
 let activeTripId: string | null = null;
 let publish: ((ping: TripPing) => Promise<void>) | null = null;
 let last: Sample | null = null;
+let lastPing: TripPing | null = null;
 let foregroundWatcher: { remove: () => void } | null = null;
+let heartbeat: ReturnType<typeof setInterval> | null = null;
+let readingFix = false;
 
 try {
 TaskManager.defineTask(TRIP_LOCATION_TASK, async ({ data, error }) => {
@@ -35,6 +38,7 @@ TaskManager.defineTask(TRIP_LOCATION_TASK, async ({ data, error }) => {
       at: new Date(loc.timestamp).toISOString(),
       accuracy: loc.coords.accuracy ?? undefined,
     };
+    lastPing = ping;
     try { await publish(ping); } catch { /* offline — buffer retries on next event */ }
   }
 });
@@ -83,22 +87,61 @@ function sendGrouped(onPings: BroadcastDeps['onPings']) {
 export const isBroadcasting = (): boolean => activeTripId !== null;
 export const getPersistedBroadcastTripId = (): Promise<string | null> => asyncStore.get<string>(BROADCAST_TRIP_KEY);
 
-// A stopped van at the first pickup never moves 50 m, so a distance-gated watcher
-// never delivers a fix and the trip looks offline. Take one reading immediately.
+// The school marks the bus offline when no ping is younger than 30s. A stopped van
+// (waiting at a pickup or drop stop) often gets no watcher callback at all, so keep
+// reading — or resend the last fix — on the same cadence until the trip ends.
 async function publishCurrentFix(): Promise<void> {
-  if (typeof Location.getCurrentPositionAsync !== 'function') return;
+  if (readingFix || !activeTripId || !publish) return;
+  const tripAtStart = activeTripId;
+  readingFix = true;
   try {
-    const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-    publishFromLocation(loc);
-  } catch {
-    // The watcher still delivers fixes. A failed one-shot must not take the trip offline.
+    if (typeof Location.getCurrentPositionAsync !== 'function') {
+      republishLast(tripAtStart);
+      return;
+    }
+    try {
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      if (activeTripId !== tripAtStart) return;
+      // A cached fix can carry an old timestamp. The school treats a ping older
+      // than 30s as offline, so stamp a quiet van with the time we read it.
+      const age = Date.now() - (loc.timestamp || 0);
+      const stamp = !loc.timestamp || age >= CADENCE_MS ? Date.now() : loc.timestamp;
+      const sent = publishFromLocation({ ...loc, timestamp: stamp });
+      if (!sent && (!last || Date.now() - last.at >= CADENCE_MS)) republishLast(tripAtStart);
+    } catch {
+      // A failed read must not take a live trip offline. Resend the last fix.
+      if (activeTripId !== tripAtStart) return;
+      republishLast(tripAtStart);
+    }
+  } finally {
+    readingFix = false;
   }
 }
 
-function publishFromLocation(loc: Location.LocationObject): void {
-  if (!activeTripId || !publish) return;
+function republishLast(tripId: string): void {
+  if (!lastPing || activeTripId !== tripId || !publish) return;
+  const at = Date.now();
+  const ping: TripPing = { ...lastPing, tripId, at: new Date(at).toISOString() };
+  last = { lat: ping.lat, lng: ping.lng, at };
+  lastPing = ping;
+  publish(ping).catch(() => { /* offline — buffer retries on next event */ });
+}
+
+function startHeartbeat(): void {
+  if (heartbeat) return;
+  heartbeat = setInterval(() => { void publishCurrentFix(); }, CADENCE_MS);
+}
+
+function stopHeartbeat(): void {
+  if (heartbeat) clearInterval(heartbeat);
+  heartbeat = null;
+  readingFix = false;
+}
+
+function publishFromLocation(loc: Location.LocationObject): boolean {
+  if (!activeTripId || !publish) return false;
   const sample: Sample = { lat: loc.coords.latitude, lng: loc.coords.longitude, at: loc.timestamp };
-  if (!shouldPublish(last, sample, CADENCE_MS, MIN_METERS)) return;
+  if (!shouldPublish(last, sample, CADENCE_MS, MIN_METERS)) return false;
   last = sample;
   const ping: TripPing = {
     tripId: activeTripId,
@@ -109,7 +152,9 @@ function publishFromLocation(loc: Location.LocationObject): void {
     at: new Date(loc.timestamp).toISOString(),
     accuracy: loc.coords.accuracy ?? undefined,
   };
+  lastPing = ping;
   publish(ping).catch(() => { /* offline — buffer retries on next event */ });
+  return true;
 }
 
 // Two resume effects (TripScreen and LiveMapScreen) can both mount right after a restart and
@@ -138,12 +183,14 @@ async function startBroadcastImpl({ tripId, onPings }: BroadcastDeps): Promise<b
 
     activeTripId = tripId;
     last = null;
+    lastPing = null;
     const buffer = await createPersistedPingBuffer(sendGrouped(onPings), PING_QUEUE_KEY);
     // Flush anything left over from a prior run that was killed before it could send.
     await buffer.flush();
     publish = (ping) => buffer.enqueue(ping).then(() => buffer.flush());
     await asyncStore.set(BROADCAST_TRIP_KEY, tripId);
     void publishCurrentFix();
+    startHeartbeat();
 
     const bg = await Location.requestBackgroundPermissionsAsync();
     if (bg.status === 'granted') {
@@ -179,15 +226,18 @@ async function startBroadcastImpl({ tripId, onPings }: BroadcastDeps): Promise<b
     );
     return true;
   } catch {
+    stopHeartbeat();
     activeTripId = null;
     publish = null;
     last = null;
+    lastPing = null;
     await asyncStore.remove(BROADCAST_TRIP_KEY).catch(() => {});
     return false;
   }
 }
 
 export async function stopBroadcast(): Promise<void> {
+  stopHeartbeat();
   try {
     if (foregroundWatcher) {
       foregroundWatcher.remove();
@@ -200,6 +250,7 @@ export async function stopBroadcast(): Promise<void> {
     activeTripId = null;
     publish = null;
     last = null;
+    lastPing = null;
     foregroundWatcher = null;
     await asyncStore.remove(BROADCAST_TRIP_KEY).catch(() => {});
   }

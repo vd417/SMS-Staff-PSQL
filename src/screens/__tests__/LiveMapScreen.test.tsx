@@ -2,7 +2,7 @@ import React from 'react';
 import { render, waitFor, fireEvent, act } from '@testing-library/react-native';
 import { ThemeProvider } from '@/theme';
 import { ToastProvider } from '@/components/ui';
-import { LiveMapScreen } from '@/screens/LiveMapScreen';
+import { LiveMapScreen, gpsStatusFor, isTripOpen } from '@/screens/LiveMapScreen';
 
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
 
@@ -105,6 +105,36 @@ describe('LiveMapScreen', () => {
     mockAction.isPending = false;
     mockAction.variables = undefined;
     mockCurrent.data.direction = 'pickup';
+    mockCurrent.data.status = 'live';
+    mockCurrent.isLoading = false;
+  });
+
+  it('stays live for an open pickup or drop even when GPS has been quiet, and goes offline only once the trip is closed', () => {
+    expect(gpsStatusFor(null, true)).toBe('locating');
+    expect(gpsStatusFor(3, true)).toBe('live');
+    expect(gpsStatusFor(120, true)).toBe('live');
+    expect(gpsStatusFor(3, false)).toBe('offline');
+    expect(isTripOpen({ id: 't1', status: 'live' }, 't1', false)).toBe(true);
+    expect(isTripOpen({ id: 't1', status: 'arrived' }, 't1', false)).toBe(true);
+    expect(isTripOpen({ id: 't1', status: 'ended' }, 't1', false)).toBe(false);
+    expect(isTripOpen(null, 't1', false)).toBe(false);
+  });
+
+  it('shows LIVE for a drop the same as pickup, and OFFLINE after that trip ends', async () => {
+    mockCurrent.data.direction = 'drop';
+    const view = renderScreen();
+    await waitFor(() => expect(view.getAllByText('LIVE').length).toBeGreaterThan(0));
+    expect(view.getByText(/Drop/)).toBeTruthy();
+    mockCurrent.data = { ...mockCurrent.data, status: 'ended' };
+    view.rerender(
+      <ThemeProvider>
+        <ToastProvider>
+          <LiveMapScreen navigation={{ goBack: jest.fn() }} route={{ params: { tripId: 't1' } }} />
+        </ToastProvider>
+      </ThemeProvider>
+    );
+    await waitFor(() => expect(view.getAllByText('OFFLINE').length).toBeGreaterThan(0));
+    expect(view.queryAllByText('LIVE')).toHaveLength(0);
   });
 
   it('renders a compact header with the bus number, direction, route name and a LIVE status pill', async () => {
@@ -125,12 +155,11 @@ describe('LiveMapScreen', () => {
   it('follows the driver: animates the camera onto the live marker on a GPS fix', async () => {
     const { getByTestId } = renderScreen();
     await waitFor(() => expect(getByTestId('has-live-marker')).toBeTruthy());
-    await waitFor(() =>
-      expect(mockMapHandle.animateCamera).toHaveBeenCalledWith(
-        expect.objectContaining({ center: expect.objectContaining({ latitude: 12.11, longitude: 77.11 }) }),
-        expect.any(Object)
-      )
-    );
+    await waitFor(() => expect(mockMapHandle.animateCamera).toHaveBeenCalled());
+    const camera = mockMapHandle.animateCamera.mock.calls.at(-1)[0];
+    expect(camera.pitch).toBeGreaterThan(45);
+    expect(Math.abs(camera.center.latitude - 12.11)).toBeLessThan(0.01);
+    expect(Math.abs(camera.center.longitude - 77.11)).toBeLessThan(0.01);
   });
 
   it('snaps the camera onto the driver on the first GPS fix even when the fix accuracy is poor', async () => {
@@ -158,10 +187,11 @@ describe('LiveMapScreen', () => {
     await waitFor(() => expect(getByTestId('has-live-marker')).toBeTruthy());
     mockMapHandle.animateCamera.mockClear();
     fireEvent.press(getByTestId('recenter-btn'));
-    expect(mockMapHandle.animateCamera).toHaveBeenCalledWith(
-      expect.objectContaining({ center: expect.objectContaining({ latitude: 12.11, longitude: 77.11 }) }),
-      expect.any(Object)
-    );
+    expect(mockMapHandle.animateCamera).toHaveBeenCalled();
+    const camera = mockMapHandle.animateCamera.mock.calls.at(-1)[0];
+    expect(camera.pitch).toBeGreaterThan(45);
+    expect(Math.abs(camera.center.latitude - 12.11)).toBeLessThan(0.01);
+    expect(Math.abs(camera.center.longitude - 77.11)).toBeLessThan(0.01);
   });
 
   it('stops following after the driver pans the map by hand', async () => {

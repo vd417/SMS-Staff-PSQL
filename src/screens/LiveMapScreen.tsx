@@ -28,8 +28,22 @@ const AUTO_ARRIVE_METERS = 120;
 
 const NEXT: Record<BoardingState, BoardingState> = { boarded: 'dropped', dropped: 'absent', absent: 'boarded' };
 
-function gpsStatusFor(secondsSinceUpdate: number | null): GpsStatus {
-  // Pickup keeps the van live from the first fix until the driver leaves this screen.
+/** Re-read GPS while the van is stopped so the on-screen fix does not go stale. */
+const POSITION_REFRESH_MS = 8_000;
+
+export function isTripOpen(
+  trip: { id: string; status: string } | null | undefined,
+  tripId: string,
+  loading: boolean,
+): boolean {
+  if (trip == null) return loading;
+  return trip.id === tripId && (trip.status === 'live' || trip.status === 'arrived');
+}
+
+export function gpsStatusFor(secondsSinceUpdate: number | null, tripOpen: boolean): GpsStatus {
+  // Pickup and drop stay live from the first fix until the driver ends the trip.
+  // A stopped van gets few GPS callbacks; that must not flip the trip offline.
+  if (!tripOpen) return 'offline';
   if (secondsSinceUpdate == null) return 'locating';
   return 'live';
 }
@@ -70,6 +84,7 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
   // a ref (not state) so the ~5s GPS cadence never triggers a re-render for camera.
   const [followMode, setFollowMode] = useState(true);
   const camStateRef = useRef<CameraState>({ heading: 0, zoom: FOLLOW_DEFAULT_ZOOM });
+  const [cameraHeading, setCameraHeading] = useState(0);
   const [liveMarker, setLiveMarker] = useState<LiveMarker | null>(null);
   const [lastPingAt, setLastPingAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -77,6 +92,7 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
   const [justCompletedStopName, setJustCompletedStopName] = useState<string | null>(null);
   const [bottomCardHeight, setBottomCardHeight] = useState(0);
   const [mapReady, setMapReady] = useState(false);
+  const tripOpen = isTripOpen(current.data, tripId, current.isLoading);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -84,8 +100,10 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
   }, []);
 
   useEffect(() => {
+    if (!tripOpen) return;
     let subscription: { remove: () => void } | null = null;
     let cancelled = false;
+    const refreshId: { current: ReturnType<typeof setInterval> | null } = { current: null };
 
     // Some expo-location versions throw inside subscription.remove()
     // (LocationEventEmitter.removeSubscription is not a function). A teardown
@@ -110,11 +128,17 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
         setLiveMarker(applyFix(loc));
         setLastPingAt(Date.now());
       };
-      // One-shot so the van, zoom, and LIVE pill appear at pickup even before the van moves.
+      // One-shot plus a refresh so the van stays live at a pickup or drop stop,
+      // before it moves and while the watcher is quiet.
       if (typeof Location.getCurrentPositionAsync === 'function') {
-        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })
-          .then(onFix)
-          .catch(() => {});
+        const read = () => {
+          if (cancelled) return;
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })
+            .then(onFix)
+            .catch(() => {});
+        };
+        read();
+        refreshId.current = setInterval(read, POSITION_REFRESH_MS);
       }
       try {
         const sub = await Location.watchPositionAsync(
@@ -133,13 +157,14 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
 
     return () => {
       cancelled = true;
+      if (refreshId.current) clearInterval(refreshId.current);
       safeRemove(subscription);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [tripOpen]);
 
   const secondsSinceUpdate = lastPingAt != null ? Math.max(0, Math.floor((now - lastPingAt) / 1000)) : null;
-  const gpsStatus = gpsStatusFor(secondsSinceUpdate);
+  const gpsStatus = gpsStatusFor(secondsSinceUpdate, tripOpen);
   const statusColor = gpsStatus === 'live' ? colors.success : gpsStatus === 'delayed' ? colors.warn : gpsStatus === 'locating' ? colors.inkSoft : colors.danger;
   const statusBg = gpsStatus === 'live' ? colors.successSoft : gpsStatus === 'delayed' ? colors.warnSoft : gpsStatus === 'locating' ? colors.sunken : colors.dangerSoft;
   const statusLabel = t(`trip.${gpsStatus}`);
@@ -178,13 +203,16 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
     [liveMarker, routeBearing],
   );
 
-  // Point the van at the route while GPS heading is unreliable (stopped at pickup).
+  // Point the van up the screen while the map itself is rotated to the road,
+  // the same way Google Maps keeps the car pointing forward.
   const pointedMarker = useMemo(() => {
     if (!liveMarker) return null;
     const moving = (liveMarker.speedKmh ?? 0) >= 5 && liveMarker.headingDeg != null;
-    if (moving || routeBearing == null) return liveMarker;
-    return { ...liveMarker, headingDeg: routeBearing };
-  }, [liveMarker, routeBearing]);
+    const bearing = moving ? liveMarker.headingDeg! : routeBearing ?? liveMarker.headingDeg;
+    if (bearing == null) return liveMarker;
+    const screenHeading = (bearing - cameraHeading + 360) % 360;
+    return { ...liveMarker, headingDeg: screenHeading };
+  }, [liveMarker, routeBearing, cameraHeading]);
 
   const stateFor = (studentId: string): BoardingState =>
     boarding.data?.find((b) => b.studentId === studentId)?.state ?? 'absent';
@@ -217,6 +245,7 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
     const next = nextFollowCamera(camStateRef.current, cameraFix);
     if (next) {
       camStateRef.current = next.state;
+      setCameraHeading(next.camera.heading);
       mapRef.current?.animateCamera(next.camera, { duration: 500 });
     } else if (!hasCenteredRef.current) {
       mapRef.current?.animateToRegion(
@@ -240,6 +269,7 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
     const next = nextFollowCamera(camStateRef.current, cameraFix ?? liveMarker);
     if (next) {
       camStateRef.current = next.state;
+      setCameraHeading(next.camera.heading);
       mapRef.current?.animateCamera(next.camera, { duration: 500 });
     } else {
       mapRef.current?.animateToRegion(

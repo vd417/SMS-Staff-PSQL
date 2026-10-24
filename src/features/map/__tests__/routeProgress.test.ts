@@ -1,4 +1,4 @@
-import { pathToNearestStop, splitRouteProgress } from '../routeProgress';
+import { guideDashes, guideToPath, pathToNearestStop, splitRouteProgress } from '../routeProgress';
 import type { MapCoord } from '../toMapCoords';
 
 const path: MapCoord[] = [
@@ -55,6 +55,22 @@ describe('splitRouteProgress', () => {
       { latitude: 0, longitude: 0.02 },
       { latitude: 0, longitude: 0 },
     ]);
+  });
+
+  it('draws a dotted guide from the van to the nearest point on the path', () => {
+    const guide = guideToPath(path, { latitude: 1, longitude: 0.01 });
+    expect(guide).toHaveLength(2);
+    expect(guide[0]).toEqual({ latitude: 1, longitude: 0.01 });
+    expect(guide[1].latitude).toBeCloseTo(1, 4);
+    expect(guide[1].longitude).toBeCloseTo(0, 4);
+    const dashes = guideDashes(guide);
+    expect(dashes.length).toBeGreaterThan(1);
+    expect(dashes.every((seg) => seg.length === 2)).toBe(true);
+  });
+
+  it('omits the guide when the van is already on the path', () => {
+    expect(guideToPath(path, { latitude: 1.5, longitude: 0 })).toEqual([]);
+    expect(guideDashes([])).toEqual([]);
   });
 
   it('never throws on a degenerate (0 or 1 point) path', () => {
