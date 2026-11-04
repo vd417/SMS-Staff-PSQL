@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "157548521334",
+    "project_id": "sms-1085d",
+    "storage_bucket": "sms-1085d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:157548521334:android:0edda9f99f9ad2699ffc57",
+        "android_client_info": {
+          "package_name": "com.catreschool.staff"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAwhPrW_pnbU1ZnJcRhc7ukpm9gjspz2Xw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:157548521334:android:aa8de8665fe84a999ffc57",
+        "android_client_info": {
+          "package_name": "com.catreschool.student"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAwhPrW_pnbU1ZnJcRhc7ukpm9gjspz2Xw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:157548521334:android:f422e5e5eebfcb629ffc57",
+        "android_client_info": {
+          "package_name": "com.catreschool.teacher"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAwhPrW_pnbU1ZnJcRhc7ukpm9gjspz2Xw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -11,6 +11,7 @@ import { isAppError } from '@/lib/errors';
 import { stopBroadcast } from '@/features/trip/broadcaster';
 import { useRepositories } from '@/data/repositories/RepositoryContext';
 import { useTheme } from '@/theme';
+import { registerDevicePush } from '@/lib/pushRegistration';
 
 const SESSION_KEY = 'sms.session';
 
@@ -95,6 +96,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     })();
   }, [repos, applyRoleFromSession]);
+
+  useEffect(() => {
+    if (status === 'authenticated') void registerDevicePush();
+  }, [status]);
 
   // The refresh token was rejected (revoked / expired after 30 days): drop to Login.
   useEffect(() => sessionEvents.onExpired(() => {

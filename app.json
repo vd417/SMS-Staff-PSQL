@@ -9,6 +9,8 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.catreschool.staff",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "config": { "googleMapsApiKey": "AIzaSyCLBnzIqfPTAoo_HnCVMP_nnd57nOMU7GY" },
       "infoPlist": {
         "UIBackgroundModes": ["location"],
@@ -17,7 +19,8 @@
       }
     },
     "android": {
-      "package": "com.catretech.schoolmatestaff",
+      "package": "com.catreschool.staff",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#126954",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -40,6 +43,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      ["expo-notifications", { "defaultChannel": "default" }],
       ["expo-location", {
         "locationAlwaysAndWhenInUsePermission": "SchoolMate Staff uses your location to share the live bus position during a trip.",
         "isAndroidBackgroundLocationEnabled": true,
