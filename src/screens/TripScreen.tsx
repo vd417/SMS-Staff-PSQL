@@ -150,13 +150,12 @@ export const TripScreen = ({ navigation }: { navigation: any }) => {
       toast.show(stopActionMessage(e, t), 'error');
       return;
     }
-    const ok = await startBroadcast({ tripId: started.id, onPings: (id, pings) => repos.trip.publishPings(id, pings) });
-    if (!ok) {
-      toast.show(t('trip.permissionDenied'), 'error');
-      await endTrip.mutateAsync(started.id);
-      return;
-    }
     navigation.navigate('LiveMap', { tripId: started.id });
+    void startBroadcast({ tripId: started.id, onPings: (id, pings) => repos.trip.publishPings(id, pings) }).then(async (ok) => {
+      if (ok) return;
+      toast.show(t('trip.permissionDenied'), 'error');
+      await endTrip.mutateAsync(started.id).catch(() => {});
+    });
   };
 
   const onEnd = async () => {

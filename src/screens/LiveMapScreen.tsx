@@ -41,11 +41,16 @@ export function isTripOpen(
 }
 
 export function gpsStatusFor(secondsSinceUpdate: number | null, tripOpen: boolean): GpsStatus {
-  // Pickup and drop stay live from the first fix until the driver ends the trip.
-  // A stopped van gets few GPS callbacks; that must not flip the trip offline.
   if (!tripOpen) return 'offline';
   if (secondsSinceUpdate == null) return 'locating';
-  return 'live';
+  if (secondsSinceUpdate <= 60) return 'live';
+  if (secondsSinceUpdate <= 300) return 'delayed';
+  return 'offline';
+}
+
+function isUsableFix(loc: Location.LocationObject): boolean {
+  const { latitude, longitude } = loc.coords;
+  return Number.isFinite(latitude) && Number.isFinite(longitude) && !(latitude === 0 && longitude === 0);
 }
 
 function applyFix(loc: Location.LocationObject): LiveMarker {
@@ -124,18 +129,21 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
         return;
       }
       const onFix = (loc: Location.LocationObject) => {
-        if (cancelled) return;
+        if (cancelled || !isUsableFix(loc)) return;
         setLiveMarker(applyFix(loc));
-        setLastPingAt(Date.now());
+        setLastPingAt(loc.timestamp && loc.timestamp > 0 ? loc.timestamp : Date.now());
       };
-      // One-shot plus a refresh so the van stays live at a pickup or drop stop,
-      // before it moves and while the watcher is quiet.
+      if (typeof Location.getLastKnownPositionAsync === 'function') {
+        Location.getLastKnownPositionAsync().then((loc) => { if (loc) onFix(loc); }).catch(() => {});
+      }
+      // Fresh high-accuracy fix in parallel. The map is already on screen; a timeout
+      // must not leave this interval stuck behind a cold GPS start.
       if (typeof Location.getCurrentPositionAsync === 'function') {
         const read = () => {
           if (cancelled) return;
-          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })
-            .then(onFix)
-            .catch(() => {});
+          const pending = Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+          const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 12_000));
+          Promise.race([pending, timeout]).then((loc) => { if (loc) onFix(loc); }).catch(() => {});
         };
         read();
         refreshId.current = setInterval(read, POSITION_REFRESH_MS);

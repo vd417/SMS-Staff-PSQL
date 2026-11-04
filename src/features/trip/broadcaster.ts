@@ -11,6 +11,8 @@ const BROADCAST_TRIP_KEY = 'sms.trip.broadcastingTripId';
 export const TRIP_LOCATION_TASK = 'sms-trip-location';
 const CADENCE_MS = 10_000;
 const MIN_METERS = 50;
+const FRESH_MS = 60_000;
+const FIX_TIMEOUT_MS = 12_000;
 
 // The active publisher is registered at startBroadcast time and read by the task.
 let activeTripId: string | null = null;
@@ -26,6 +28,7 @@ TaskManager.defineTask(TRIP_LOCATION_TASK, async ({ data, error }) => {
   if (error || !data || !activeTripId || !publish) return;
   const { locations } = data as { locations: Location.LocationObject[] };
   for (const loc of locations) {
+    if (!isUsable(loc.coords.latitude, loc.coords.longitude)) continue;
     const sample: Sample = { lat: loc.coords.latitude, lng: loc.coords.longitude, at: loc.timestamp };
     if (!shouldPublish(last, sample, CADENCE_MS, MIN_METERS)) continue;
     last = sample;
@@ -87,44 +90,47 @@ function sendGrouped(onPings: BroadcastDeps['onPings']) {
 export const isBroadcasting = (): boolean => activeTripId !== null;
 export const getPersistedBroadcastTripId = (): Promise<string | null> => asyncStore.get<string>(BROADCAST_TRIP_KEY);
 
-// The school marks the bus offline when no ping is younger than 30s. A stopped van
-// (waiting at a pickup or drop stop) often gets no watcher callback at all, so keep
-// reading — or resend the last fix — on the same cadence until the trip ends.
+function isUsable(lat: number, lng: number): boolean {
+  return Number.isFinite(lat) && Number.isFinite(lng)
+    && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+    && !(lat === 0 && lng === 0);
+}
+
+function withTimeout<T>(work: Promise<T>, ms: number): Promise<T | null> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), ms);
+    work.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      () => { clearTimeout(timer); resolve(null); },
+    );
+  });
+}
+
+// Last known fix first (so the map and the school are not blank), then a fresh
+// high-accuracy read in parallel with a timeout. A failed or stale read is not
+// re-stamped as a new live ping — the server's 60s rule stays honest.
 async function publishCurrentFix(): Promise<void> {
   if (readingFix || !activeTripId || !publish) return;
   const tripAtStart = activeTripId;
   readingFix = true;
   try {
-    if (typeof Location.getCurrentPositionAsync !== 'function') {
-      republishLast(tripAtStart);
-      return;
+    if (typeof Location.getLastKnownPositionAsync === 'function') {
+      const known = await withTimeout(Location.getLastKnownPositionAsync(), 1_500);
+      if (activeTripId === tripAtStart && known && isUsable(known.coords.latitude, known.coords.longitude)) {
+        const age = Date.now() - (known.timestamp || 0);
+        if (known.timestamp && age >= 0 && age <= FRESH_MS) publishFromLocation(known);
+      }
     }
-    try {
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      if (activeTripId !== tripAtStart) return;
-      // A cached fix can carry an old timestamp. The school treats a ping older
-      // than 30s as offline, so stamp a quiet van with the time we read it.
-      const age = Date.now() - (loc.timestamp || 0);
-      const stamp = !loc.timestamp || age >= CADENCE_MS ? Date.now() : loc.timestamp;
-      const sent = publishFromLocation({ ...loc, timestamp: stamp });
-      if (!sent && (!last || Date.now() - last.at >= CADENCE_MS)) republishLast(tripAtStart);
-    } catch {
-      // A failed read must not take a live trip offline. Resend the last fix.
-      if (activeTripId !== tripAtStart) return;
-      republishLast(tripAtStart);
-    }
+    if (typeof Location.getCurrentPositionAsync !== 'function') return;
+    const loc = await withTimeout(
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
+      FIX_TIMEOUT_MS,
+    );
+    if (activeTripId !== tripAtStart || !loc || !isUsable(loc.coords.latitude, loc.coords.longitude)) return;
+    publishFromLocation(loc);
   } finally {
     readingFix = false;
   }
-}
-
-function republishLast(tripId: string): void {
-  if (!lastPing || activeTripId !== tripId || !publish) return;
-  const at = Date.now();
-  const ping: TripPing = { ...lastPing, tripId, at: new Date(at).toISOString() };
-  last = { lat: ping.lat, lng: ping.lng, at };
-  lastPing = ping;
-  publish(ping).catch(() => { /* offline — buffer retries on next event */ });
 }
 
 function startHeartbeat(): void {
@@ -140,6 +146,7 @@ function stopHeartbeat(): void {
 
 function publishFromLocation(loc: Location.LocationObject): boolean {
   if (!activeTripId || !publish) return false;
+  if (!isUsable(loc.coords.latitude, loc.coords.longitude)) return false;
   const sample: Sample = { lat: loc.coords.latitude, lng: loc.coords.longitude, at: loc.timestamp };
   if (!shouldPublish(last, sample, CADENCE_MS, MIN_METERS)) return false;
   last = sample;

@@ -112,7 +112,7 @@ describe('LiveMapScreen', () => {
   it('stays live for an open pickup or drop even when GPS has been quiet, and goes offline only once the trip is closed', () => {
     expect(gpsStatusFor(null, true)).toBe('locating');
     expect(gpsStatusFor(3, true)).toBe('live');
-    expect(gpsStatusFor(120, true)).toBe('live');
+    expect(gpsStatusFor(120, true)).toBe('delayed');
     expect(gpsStatusFor(3, false)).toBe('offline');
     expect(isTripOpen({ id: 't1', status: 'live' }, 't1', false)).toBe(true);
     expect(isTripOpen({ id: 't1', status: 'arrived' }, 't1', false)).toBe(true);
