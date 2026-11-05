@@ -11,7 +11,7 @@ import { isAppError } from '@/lib/errors';
 import { stopBroadcast } from '@/features/trip/broadcaster';
 import { useRepositories } from '@/data/repositories/RepositoryContext';
 import { useTheme } from '@/theme';
-import { registerDevicePush } from '@/lib/pushRegistration';
+import { registerDevicePush, unregisterDevicePush } from '@/lib/pushRegistration';
 
 const SESSION_KEY = 'sms.session';
 
@@ -156,6 +156,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = useCallback(async () => {
     try {
+      await unregisterDevicePush();
       // The stored pair is authoritative — it may have been rotated since sign-in.
       const current = (await tokenStore.read())?.refreshToken ?? session?.refreshToken ?? null;
       await repos.auth.logout(current);
