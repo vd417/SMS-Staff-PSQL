@@ -25,6 +25,13 @@ describe('Avatar', () => {
     const { getByText } = renderWithTheme(<Avatar name="Ramesh Kumar" />);
     expect(getByText('RK')).toBeTruthy();
   });
+  it('renders a profile photo when a photo is provided', () => {
+    const { getByTestId, queryByText } = renderWithTheme(
+      <Avatar name="Ramesh Kumar" photoUri="https://cdn.example/ramesh.png" />,
+    );
+    expect(getByTestId('avatar-photo')).toBeTruthy();
+    expect(queryByText('RK')).toBeNull();
+  });
 });
 
 describe('Pill', () => {

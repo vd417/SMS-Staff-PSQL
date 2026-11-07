@@ -8,6 +8,15 @@ import { createMockRepositories } from '@/data/repositories/factory';
 import { createStore } from '@/data/mock/store';
 import { LeaveScreen } from '@/screens/LeaveScreen';
 
+jest.mock('expo-image-picker', () => ({
+  requestMediaLibraryPermissionsAsync: jest.fn(async () => ({ status: 'granted' })),
+  launchImageLibraryAsync: jest.fn(async () => ({ canceled: true, assets: [] })),
+}));
+jest.mock('expo-image-manipulator', () => ({
+  ImageManipulator: { manipulate: jest.fn() },
+  SaveFormat: { JPEG: 'jpeg' },
+}));
+
 jest.mock('@react-native-async-storage/async-storage', () => {
   let mem: Record<string, string> = {};
   return { __esModule: true, default: {
@@ -35,6 +44,7 @@ async function renderScreen() {
 it('shows balances and submits a request', async () => {
   const { findAllByText, getByTestId } = await renderScreen();
   await findAllByText(/casual|Casual/);
+  expect(getByTestId('leave-add-document')).toBeTruthy();
   fireEvent.changeText(getByTestId('leave-reason'), 'Doctor appointment');
   fireEvent.press(getByTestId('leave-submit'));
   await waitFor(() => expect(getByTestId('leave-submitted')).toBeTruthy());

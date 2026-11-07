@@ -3,7 +3,7 @@ import type { HttpClient } from '@/lib/httpClient';
 import { deviceUtcOffsetMinutes } from '@/lib/date';
 import { toAttendance, toSchoolLocation } from './mappers';
 import { parseWire } from './schemas/wire';
-import { attendanceSchema, schoolLocationSchema } from './schemas/attendance.schema';
+import { attendanceSchema, attendanceHistorySchema, schoolLocationSchema } from './schemas/attendance.schema';
 
 export function httpAttendance(http: HttpClient): AttendanceRepository {
   const punch = (path: string, at: string, lat: number, lng: number, accuracyMeters: number) =>
@@ -15,6 +15,13 @@ export function httpAttendance(http: HttpClient): AttendanceRepository {
       http
         .get('/staff/attendance', { offset_minutes: deviceUtcOffsetMinutes() })
         .then((d) => toAttendance(parseWire(attendanceSchema, d, 'attendance'))),
+    history: () =>
+      http
+        .get('/me/attendance/history', { limit: 366, offset_minutes: deviceUtcOffsetMinutes() })
+        .then((d) => parseWire(attendanceHistorySchema, d, 'attendance history').map((day) => ({
+          date: day.date.slice(0, 10),
+          checkedIn: day.check_in != null,
+        }))),
     schoolLocation: () =>
       http
         .get('/me/attendance/school-location')

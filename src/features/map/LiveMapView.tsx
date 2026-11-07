@@ -14,7 +14,7 @@ import { RouteUnavailableBadge } from './RouteUnavailableBadge';
 import { MapErrorBoundary } from './MapErrorBoundary';
 import { stopRoles } from './stopRoles';
 import { routeSegments } from './routeSegments';
-import { guideDashes, guideToPath, splitRouteProgress } from './routeProgress';
+import { guideToPath, splitRouteProgress } from './routeProgress';
 import { GuideCursor } from './GuideCursor';
 import { useGlidedCoord } from './useGlidedCoord';
 import type { LiveMapViewProps, LiveMapHandle } from './liveMapTypes';
@@ -41,7 +41,7 @@ const MapFallback: React.FC<{ retry: () => void; destination?: MapCoord }> = ({ 
   );
 };
 
-export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops, liveMarker, onMapReady, routeGeometry, onUserPan }, ref) => {
+export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops, liveMarker, onMapReady, routeGeometry, roadGuide, onUserPan }, ref) => {
   const { colors } = useTheme();
   const mapRef = useRef<MapView>(null);
 
@@ -78,7 +78,7 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
   const offRoute = route?.offRoute ?? false;
   const roles = stopRoles(safeStops, safeLive, { offRoute });
   const guide = guideToPath(line ?? coords, safeLive);
-  const guideDots = guideDashes(guide);
+  const road = roadGuide && roadGuide.length > 1 ? roadGuide : null;
   // Glide the marker between the ~5 s fixes instead of letting it teleport.
   const glidedLive = useGlidedCoord(safeLive);
 
@@ -105,20 +105,12 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
         {route && route.traveled.length > 1 && (
           <Polyline testID="map-polyline-traveled" coordinates={route.traveled} strokeWidth={9} strokeColor={colors.primaryDim} lineCap="round" lineJoin="round" geodesic />
         )}
-        {guideDots.map((seg, i) => (
-          <Polyline key={`guide-casing-${i}`} coordinates={seg} strokeWidth={8} strokeColor="#FFFFFF" lineCap="round" geodesic />
-        ))}
-        {guideDots.map((seg, i) => (
-          <Polyline
-            key={`guide-${i}`}
-            testID="map-guide-to-path"
-            coordinates={seg}
-            strokeWidth={5}
-            strokeColor="#7ECFC0"
-            lineCap="round"
-            geodesic
-          />
-        ))}
+        {road && (
+          <Polyline coordinates={road} strokeWidth={10} strokeColor="#FFFFFF" lineCap="round" lineJoin="round" />
+        )}
+        {road && (
+          <Polyline testID="map-guide-to-path" coordinates={road} strokeWidth={6} strokeColor="#1A73E8" lineCap="round" lineJoin="round" />
+        )}
         {guide.length > 1 && (
           <Marker coordinate={guide[guide.length - 1]} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges>
             <GuideCursor />

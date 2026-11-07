@@ -13,6 +13,12 @@ export const attendanceSchema = z.object({
   geofence_radius_m: z.number(),
 });
 
+export const attendanceHistoryDaySchema = z.object({
+  date: z.string(),
+  check_in: z.unknown().nullish(),
+});
+export const attendanceHistorySchema = z.array(attendanceHistoryDaySchema);
+
 export const schoolLocationSchema = z.object({
   lat: z.number(),
   lng: z.number(),

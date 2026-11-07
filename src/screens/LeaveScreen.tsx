@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, Pressable, StyleSheet } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, TextInput, Pressable, Image, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import * as ImagePicker from 'expo-image-picker';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { z } from 'zod';
 import { useTheme } from '@/theme';
 import { useLeaveSummary, useSubmitLeave } from '@/features/leave/hooks';
@@ -11,6 +13,8 @@ import { TextScale } from '@/theme/typography';
 import type { LeaveType } from '@/data/domain';
 
 const TYPES: LeaveType[] = ['casual', 'sick', 'earned'];
+const MAX_DOCUMENTS = 5;
+const MAX_PHOTO_BASE64_LENGTH = 380000;
 const schema = z.object({
   type: z.enum(['casual', 'sick', 'earned']),
   fromDate: z.string().min(1),
@@ -21,7 +25,6 @@ const schema = z.object({
 export const LeaveScreen = () => {
   const { t } = useTranslation();
   const { colors, role } = useTheme();
-  const insets = useSafeAreaInsets();
   const { data, isLoading, isError, refetch } = useLeaveSummary();
   const submit = useSubmitLeave();
   const today = new Date().toISOString().split('T')[0];
@@ -29,26 +32,50 @@ export const LeaveScreen = () => {
   const [fromDate, setFromDate] = useState(today);
   const [toDate, setToDate] = useState(today);
   const [reason, setReason] = useState('');
+  const [documents, setDocuments] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+
+  const addDocument = async () => {
+    if (documents.length >= MAX_DOCUMENTS) return;
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (perm.status !== 'granted') return;
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.5 });
+    if (result.canceled || !result.assets?.[0]) return;
+    try {
+      const rendered = await ImageManipulator.manipulate(result.assets[0].uri)
+        .resize({ width: 1024 })
+        .renderAsync();
+      const saved = await rendered.saveAsync({ base64: true, compress: 0.5, format: SaveFormat.JPEG });
+      if (!saved.base64 || saved.base64.length > MAX_PHOTO_BASE64_LENGTH) {
+        setError(t('leave.submitError'));
+        return;
+      }
+      setDocuments((prev) => [...prev, `data:image/jpeg;base64,${saved.base64}`].slice(0, MAX_DOCUMENTS));
+      setError(null);
+    } catch {
+      setError(t('leave.submitError'));
+    }
+  };
 
   const onSubmit = async () => {
     const parsed = schema.safeParse({ type, fromDate, toDate, reason });
     if (!parsed.success) { setError(t('leave.invalid')); return; }
     setError(null);
     try {
-      await submit.mutateAsync(parsed.data);
+      await submit.mutateAsync(documents.length > 0 ? { ...parsed.data, attachmentUrls: documents } : parsed.data);
       setSubmitted(true);
       setReason('');
+      setDocuments([]);
     } catch {
       setError(t('leave.submitError'));
     }
   };
 
   return (
-    <SafeAreaView style={[styles.fill, { backgroundColor: colors.bg }]}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.fill, { backgroundColor: colors.bg }]}>
       <Text style={[TextScale.screenTitle, styles.title, { color: colors.ink }]}>{t('leave.title')}</Text>
-      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 160 }]}>
+      <ScrollView contentContainerStyle={styles.body}>
         {isLoading ? <Skeleton width="100%" height={90} radius={16} />
           : isError ? <ErrorState onRetry={refetch} />
           : (
@@ -74,6 +101,20 @@ export const LeaveScreen = () => {
                 <TextInput testID="leave-from" placeholder={t('leave.from')} placeholderTextColor={colors.inkFaint} value={fromDate} onChangeText={setFromDate} style={[styles.input, { borderColor: colors.sunken, color: colors.ink }]} />
                 <TextInput testID="leave-to" placeholder={t('leave.to')} placeholderTextColor={colors.inkFaint} value={toDate} onChangeText={setToDate} style={[styles.input, { borderColor: colors.sunken, color: colors.ink }]} />
                 <TextInput testID="leave-reason" placeholder={t('leave.reason')} placeholderTextColor={colors.inkFaint} value={reason} onChangeText={setReason} style={[styles.input, { borderColor: colors.sunken, color: colors.ink }]} />
+                <Text style={[TextScale.caption, { color: colors.ink }]}>{t('leave.documents')}</Text>
+                <Text style={[TextScale.caption, { color: colors.inkSoft, marginBottom: 8 }]}>{t('leave.documentsHint')}</Text>
+                <View style={styles.docRow}>
+                  {documents.map((uri, index) => (
+                    <Pressable key={`${index}-${uri.slice(0, 24)}`} onPress={() => setDocuments((prev) => prev.filter((_, i) => i !== index))}>
+                      <Image testID={`leave-document-${index}`} source={{ uri }} style={styles.docThumb} />
+                    </Pressable>
+                  ))}
+                  {documents.length < MAX_DOCUMENTS ? (
+                    <Pressable testID="leave-add-document" onPress={addDocument} style={[styles.docAdd, { borderColor: role.accent }]}>
+                      <Text style={[TextScale.caption, { color: role.accent }]}>{t('leave.addDocument')}</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
                 {error ? <Text style={[TextScale.caption, { color: colors.danger }]}>{error}</Text> : null}
                 <Btn testID="leave-submit" label={t('leave.submit')} onPress={onSubmit} accent={role.accent} loading={submit.isPending} style={styles.cta} />
                 {submitted ? <View testID="leave-submitted"><Pill label={t('leave.submitted')} color={colors.success} bg={colors.successSoft} icon="check" /></View> : null}
@@ -84,6 +125,13 @@ export const LeaveScreen = () => {
                 <Card key={r.id}>
                   <Text style={[TextScale.body, { color: colors.ink }]}>{t(`leave.type.${r.type}`)} · {r.fromDate} → {r.toDate}</Text>
                   <Pill label={t(`leave.status.${r.status}`)} color={r.status === 'approved' ? colors.success : r.status === 'rejected' ? colors.danger : colors.warn} bg={colors.surface2} />
+                  {r.attachmentUrls && r.attachmentUrls.length > 0 ? (
+                    <View style={styles.docRow}>
+                      {r.attachmentUrls.map((uri, index) => (
+                        <Image key={`${r.id}-${index}`} source={{ uri }} style={styles.docThumb} />
+                      ))}
+                    </View>
+                  ) : null}
                   {r.status !== 'pending' && (r.decidedByName || r.decidedNote) ? (
                     <Text testID={`leave-decision-${r.id}`} style={[TextScale.caption, { color: colors.inkSoft, marginTop: 6 }]}>
                       {r.decidedByName ? t('leave.decidedBy', { name: r.decidedByName }) : ''}
@@ -103,11 +151,14 @@ export const LeaveScreen = () => {
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   title: { paddingHorizontal: 16, paddingTop: 12 },
-  body: { padding: 16, gap: 12 },
+  body: { padding: 16, gap: 12, paddingBottom: 24 },
   balances: { flexDirection: 'row', gap: 10 },
   balCard: { flex: 1 },
   typeRow: { flexDirection: 'row', gap: 8, marginVertical: 12 },
   typeBtn: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 12, borderWidth: 1.5 },
   input: { borderWidth: 1.5, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 10 },
   cta: { marginTop: 4 },
+  docRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+  docThumb: { width: 72, height: 72, borderRadius: 12 },
+  docAdd: { width: 72, height: 72, borderRadius: 12, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', padding: 6 },
 });

@@ -11,6 +11,8 @@ export interface LiveMapViewProps {
   liveMarker?: LiveMarker | null;
   onMapReady?: () => void;
   routeGeometry?: RouteGeometry | null;
+  /** Road path from the bus back onto the route. The planned route highlight is separate. */
+  roadGuide?: { latitude: number; longitude: number }[] | null;
   /** Fired when the driver pans/drags/zooms the map by hand, so the screen can
    *  drop out of follow mode. Not fired by programmatic camera moves. */
   onUserPan?: () => void;

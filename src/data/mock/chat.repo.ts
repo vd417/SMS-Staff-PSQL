@@ -16,7 +16,9 @@ export function mockChat(): ChatRepository {
     },
     async createThread(contact: ChatContact): Promise<ChatThread> {
       await simulateLatency();
-      return { id: `t_${Date.now()}`, name: contact.name, role: contact.role, unread: 0 };
+      const thread: ChatThread = { id: `t_${Date.now()}`, name: contact.name, role: contact.role, unread: 0 };
+      if (contact.photoUrl) thread.photoUrl = contact.photoUrl;
+      return thread;
     },
     async messages() {
       await simulateLatency();

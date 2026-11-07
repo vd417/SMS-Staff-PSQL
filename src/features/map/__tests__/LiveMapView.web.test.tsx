@@ -137,13 +137,13 @@ describe('LiveMapView (web)', () => {
 
   it('shows the bus icon and a light highlight on each nearby stop when the van is off the route', () => {
     process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY = 'test-key';
-    const { getByTestId, getAllByTestId } = renderWithTheme(
+    const { getByTestId, queryByTestId } = renderWithTheme(
       <LiveMapView stops={stops} liveMarker={{ latitude: 12.1, longitude: 77.098 }} />,
     );
     expect(within(getByTestId('map-live-marker')).getByTestId('bus-marker')).toBeTruthy();
     expect(within(getByTestId('map-stop-s1')).getByTestId('stop-marker-near')).toBeTruthy();
     expect(getByTestId('map-stop-s1')).toHaveTextContent('Gate');
-    expect(getAllByTestId('map-guide-to-path').length).toBeGreaterThan(0);
+    expect(queryByTestId('map-guide-to-path')).toBeNull();
     expect(getByTestId('map-guide-cursor')).toBeTruthy();
     expect(within(getByTestId('map-stop-s2')).queryByTestId('stop-marker-near')).toBeNull();
   });

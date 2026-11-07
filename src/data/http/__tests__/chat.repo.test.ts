@@ -16,12 +16,12 @@ describe('httpChat', () => {
   it('maps the thread list (snake_case) to domain ChatThread', async () => {
     const { http } = fakeHttp({
       'GET /threads': [
-        { id: 't1', name: 'Principal', role: 'school.principal', last_message: 'Please call', last_at: '2026-10-10T06:00:00Z', unread: 2 },
-        { id: 't2', name: 'Office', role: null, last_message: null, last_at: null, unread: 0 },
+        { id: 't1', name: 'Principal', role: 'school.principal', last_message: 'Please call', last_at: '2026-10-10T06:00:00Z', unread: 2, photo_url: 'https://cdn.example/principal.png', last_message_mine: true, last_message_status: 'read' },
+        { id: 't2', name: 'Office', role: null, last_message: null, last_at: null, unread: 0, photo_url: null },
       ],
     });
     const threads = await httpChat(http).threads();
-    expect(threads[0]).toEqual({ id: 't1', name: 'Principal', role: 'school.principal', lastMessage: 'Please call', lastAt: '2026-10-10T06:00:00Z', unread: 2 });
+    expect(threads[0]).toEqual({ id: 't1', name: 'Principal', role: 'school.principal', lastMessage: 'Please call', lastAt: '2026-10-10T06:00:00Z', unread: 2, photoUrl: 'https://cdn.example/principal.png', lastMessageMine: true, lastMessageStatus: 'read' });
     expect(threads[1]).toEqual({ id: 't2', name: 'Office', unread: 0 });
   });
 
@@ -44,13 +44,13 @@ describe('httpChat', () => {
   it('lists management contacts', async () => {
     const { http } = fakeHttp({
       'GET /threads/contacts': [
-        { id: 'u1', kind: 'user', name: 'Priya Deshmukh', role: 'Principal' },
-        { id: 'u2', kind: 'user', name: 'School Owner', role: 'School Owner' },
+        { id: 'u1', kind: 'user', name: 'Priya Deshmukh', role: 'Principal', photo_url: 'https://cdn.example/priya.png' },
+        { id: 'u2', kind: 'user', name: 'School Owner', role: 'School Owner', photo_url: '  ' },
       ],
     });
     const contacts = await httpChat(http).contacts();
     expect(contacts).toEqual([
-      { id: 'u1', kind: 'user', name: 'Priya Deshmukh', role: 'Principal' },
+      { id: 'u1', kind: 'user', name: 'Priya Deshmukh', role: 'Principal', photoUrl: 'https://cdn.example/priya.png' },
       { id: 'u2', kind: 'user', name: 'School Owner', role: 'School Owner' },
     ]);
   });

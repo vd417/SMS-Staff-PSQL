@@ -4,6 +4,12 @@ export interface AttendanceLog {
   inZone: boolean;
 }
 
+/** One calendar day from attendance history. `date` is YYYY-MM-DD in the device's local day. */
+export interface AttendanceDay {
+  date: string;
+  checkedIn: boolean;
+}
+
 export interface Attendance {
   checkedIn: boolean;
   checkInAt?: string;

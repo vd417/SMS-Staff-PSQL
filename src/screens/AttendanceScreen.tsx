@@ -23,6 +23,7 @@ import {
 } from '@/components/ui';
 import {
   useAttendanceStatus,
+  useAttendanceHistory,
   useSchoolLocation,
   useCheckIn,
   useCheckOut,
@@ -102,6 +103,7 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({ navigation }
   const toast = useToast();
 
   const att = useAttendanceStatus();
+  const historyDays = useAttendanceHistory();
   const leave = useLeaveSummary();
   const schoolLocation = useSchoolLocation();
   const checkIn = useCheckIn();
@@ -167,6 +169,9 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({ navigation }
 
   // __DEV__ toggle takes precedence when set; otherwise use the real geo-derived state.
   const inRange = demoInRange !== null ? demoInRange : geoInRange;
+  // Drivers and conductors punch from the route, not only inside the campus gate.
+  // Distance stays on screen; it does not block check-in or check-out.
+  const punchAnywhere = role.key === 'driver' || role.key === 'conductor';
 
   // Derive GeoRadar state
   const radarState: 'locating' | 'in' | 'out' = locating
@@ -188,7 +193,7 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({ navigation }
       ? 'doneForToday'
       : locating
         ? 'locating'
-        : !inRange
+        : !position || (!punchAnywhere && !inRange)
           ? 'out'
           : 'ready';
 
@@ -233,13 +238,24 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({ navigation }
     ? t('attendance.doneForTodayHelper')
     : locating
       ? t('attendance.locating')
-      : inRange
-        ? t('attendance.inZone') + demoSuffix
-        : t('attendance.outZone', { distance: distanceM !== undefined ? formatDistance(distanceM) : '?' }) + demoSuffix;
+      : punchAnywhere
+        ? (distanceM !== undefined ? t('attendance.distanceNote', { distance: formatDistance(distanceM) }) : '')
+        : inRange
+          ? t('attendance.inZone') + demoSuffix
+          : t('attendance.outZone', { distance: distanceM !== undefined ? formatDistance(distanceM) : '?' }) + demoSuffix;
 
   // Full check-in/check-out history, grouped by calendar day (newest first).
   const history = att.data?.lastLog ?? [];
   const historyGroups = groupLogsByDay(history);
+  // Calendar marks follow each day's real date across months, not only today's log.
+  const calendarLogs: AttendanceLog[] = [
+    ...(historyDays.data ?? []).filter((day) => day.checkedIn).map((day) => ({
+      at: day.date,
+      kind: 'in' as const,
+      inZone: true,
+    })),
+    ...history.filter((log) => log.kind === 'in'),
+  ];
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
@@ -337,7 +353,7 @@ export const AttendanceScreen: React.FC<AttendanceScreenProps> = ({ navigation }
         </Text>
 
         <AttendanceCalendar
-          logs={history}
+          logs={calendarLogs}
           leaveRequests={(leave.data?.requests ?? []).filter((r) => r.status !== 'rejected')}
         />
 

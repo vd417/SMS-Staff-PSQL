@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import i18next from 'i18next';
 import { useNavigation } from '@react-navigation/native';
@@ -25,7 +25,6 @@ function formatJoined(value: string): string {
 export const ProfileScreen = () => {
   const { t } = useTranslation();
   const { colors, dark, setDark, role } = useTheme();
-  const insets = useSafeAreaInsets();
   const { session } = useAuth();
   const logout = useLogout();
   const navigation = useNavigation();
@@ -47,8 +46,8 @@ export const ProfileScreen = () => {
   );
 
   return (
-    <SafeAreaView style={[styles.fill, { backgroundColor: colors.bg }]}>
-      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 120 }]}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.fill, { backgroundColor: colors.bg }]}>
+      <ScrollView contentContainerStyle={styles.body}>
         <Card padded={false}>
           <View style={[styles.band, { backgroundColor: role.accent }]} />
           <View style={styles.identity}>
@@ -168,7 +167,7 @@ export const ProfileScreen = () => {
               style={styles.row}
             >
               <View style={[styles.iconTile, { backgroundColor: colors.goldSoft }]}>
-                <Icon name="doc" size={20} color={colors.gold} strokeWidth={1.9} />
+                <Icon name="calendar" size={20} color={colors.gold} strokeWidth={1.9} />
               </View>
               <View style={styles.rowText}>
                 <Text style={[TextScale.bodyStrong, { color: colors.ink }]}>{t('profile.applyLeave')}</Text>
@@ -276,7 +275,7 @@ function DetailRow({
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  body: { padding: 16, gap: 18 },
+  body: { padding: 16, gap: 18, paddingBottom: 24 },
   band: { height: 78 },
   identity: { alignItems: 'center', marginTop: -40, paddingHorizontal: 16, paddingBottom: 18, gap: 8 },
   avatarWrap: { padding: 4, borderRadius: 48 },

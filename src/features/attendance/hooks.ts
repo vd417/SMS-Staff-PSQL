@@ -26,6 +26,17 @@ export function useAttendanceStatus() {
   });
 }
 
+/** Check-in dates for the month calendar. Today's punch is merged in by the screen. */
+export function useAttendanceHistory() {
+  const repos = useRepositories();
+  const tenantId = useTenantId();
+  return useQuery({
+    queryKey: queryKeys.attendanceHistory(tenantId),
+    queryFn: () => repos.attendance.history(),
+    staleTime: 60_000,
+  });
+}
+
 export function useSchoolLocation() {
   const repos = useRepositories();
   const tenantId = useTenantId();
@@ -65,7 +76,10 @@ export function useCheckIn() {
       if (ctx?.prev) qc.setQueryData(key, ctx.prev);
       else qc.removeQueries({ queryKey: key });
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: key }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: key });
+      qc.invalidateQueries({ queryKey: queryKeys.attendanceHistory(tenantId) });
+    },
   });
 }
 
@@ -91,6 +105,9 @@ export function useCheckOut() {
       if (ctx?.prev) qc.setQueryData(key, ctx.prev);
       else qc.removeQueries({ queryKey: key });
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: key }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: key });
+      qc.invalidateQueries({ queryKey: queryKeys.attendanceHistory(tenantId) });
+    },
   });
 }

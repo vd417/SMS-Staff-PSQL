@@ -1,4 +1,5 @@
 import React from 'react';
+import { Alert } from 'react-native';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -44,6 +45,15 @@ beforeEach(async () => {
   mockBroadcaster.stopBroadcast.mockReset().mockResolvedValue(undefined);
   mockBroadcaster.isBroadcasting.mockReset().mockReturnValue(false);
   mockBroadcaster.getPersistedBroadcastTripId.mockReset().mockResolvedValue(null);
+  jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+    const list = buttons as { style?: string; onPress?: () => void }[] | undefined;
+    const confirm = list?.find((b) => b.style === 'destructive') ?? list?.[list.length - 1];
+    confirm?.onPress?.();
+  });
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 async function renderScreen(reposOverride?: ReturnType<typeof createMockRepositories>) {
@@ -227,6 +237,43 @@ it('ends the trip on the server before stopping the broadcast, so a failed end k
   await waitFor(() => expect(getByTestId('trip-end')).toBeTruthy());
   fireEvent.press(getByTestId('trip-end'));
   await waitFor(() => expect(order).toEqual(['endTrip', 'stopBroadcast']));
+});
+
+it('does not end the trip when the confirmation is cancelled', async () => {
+  jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+    const list = buttons as { style?: string; onPress?: () => void }[] | undefined;
+    list?.find((b) => b.style === 'cancel')?.onPress?.();
+  });
+  const repos = createMockRepositories(await createStore());
+  const endTrip = jest.fn();
+  repos.trip.endTrip = endTrip;
+  const { getByTestId, findByText } = await renderScreen(repos);
+  await findByText(/Route 7/);
+  fireEvent.press(getByTestId('trip-start'));
+  await waitFor(() => expect(getByTestId('trip-end')).toBeTruthy());
+  fireEvent.press(getByTestId('trip-end'));
+  expect(endTrip).not.toHaveBeenCalled();
+  expect(getByTestId('trip-end')).toBeTruthy();
+});
+
+it('after a confirmed pickup end, pickup stays done for the day and drop can still start', async () => {
+  const first = await renderScreen();
+  await first.findByText(/Route 7/);
+  fireEvent.press(first.getByTestId('trip-start'));
+  await waitFor(() => expect(first.getByTestId('trip-end')).toBeTruthy());
+  fireEvent.press(first.getByTestId('trip-end'));
+  await first.findByText(/Trip summary/);
+  first.unmount();
+
+  const { getByTestId, findByText } = await renderScreen();
+  await findByText(/Route 7/);
+  await waitFor(() => expect(getByTestId('trip-dir-pickup-done')).toBeTruthy());
+  expect(getByTestId('trip-dir-pickup').props.accessibilityState.disabled).toBe(true);
+  await waitFor(() => expect(getByTestId('trip-dir-drop').props.accessibilityState.selected).toBe(true));
+  fireEvent.press(getByTestId('trip-dir-pickup'));
+  fireEvent.press(getByTestId('trip-start'));
+  await waitFor(() => expect(getByTestId('trip-end')).toBeTruthy());
+  expect(getByTestId('trip-direction-pill')).toHaveTextContent('Drop');
 });
 
 it('keeps broadcasting and shows an error toast when ending the trip fails (e.g. offline)', async () => {

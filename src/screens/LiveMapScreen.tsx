@@ -16,6 +16,9 @@ import { nextFollowCamera, FOLLOW_DEFAULT_ZOOM, type CameraState } from '@/featu
 import { routeStripFor, type StopAction } from '@/features/trip/stopProgress';
 import { LiveMapView } from '@/features/map/LiveMapView';
 import { toMapCoords } from '@/features/map/toMapCoords';
+import { guideToPath } from '@/features/map/routeProgress';
+import { useDrivePath } from '@/features/map/useDrivePath';
+import { decodePolyline } from '@/lib/decodePolyline';
 import { bearingDegrees, distanceMeters } from '@/lib/geo';
 import type { LiveMapHandle } from '@/features/map/liveMapTypes';
 import type { BoardingState } from '@/data/domain';
@@ -213,6 +216,15 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
 
   // Point the van up the screen while the map itself is rotated to the road,
   // the same way Google Maps keeps the car pointing forward.
+  const routeLine = useMemo(() => {
+    if (geometry.data?.status === 'available' && geometry.data.geometry) {
+      const decoded = decodePolyline(geometry.data.geometry);
+      if (decoded.length > 1) return decoded;
+    }
+    const coords = toMapCoords(stops);
+    return coords.length > 1 ? coords : [];
+  }, [geometry.data, stops]);
+
   const pointedMarker = useMemo(() => {
     if (!liveMarker) return null;
     const moving = (liveMarker.speedKmh ?? 0) >= 5 && liveMarker.headingDeg != null;
@@ -221,6 +233,12 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
     const screenHeading = (bearing - cameraHeading + 360) % 360;
     return { ...liveMarker, headingDeg: screenHeading };
   }, [liveMarker, routeBearing, cameraHeading]);
+
+  const rejoin = useMemo(
+    () => (pointedMarker ? guideToPath(routeLine, pointedMarker) : []),
+    [routeLine, pointedMarker],
+  );
+  const roadGuide = useDrivePath(rejoin[0] ?? null, rejoin[1] ?? null);
 
   const stateFor = (studentId: string): BoardingState =>
     boarding.data?.find((b) => b.studentId === studentId)?.state ?? 'absent';
@@ -344,7 +362,7 @@ export const LiveMapScreen = ({ navigation, route }: { navigation: any; route: {
         ) : assignment.isError ? (
           <ErrorState onRetry={assignment.refetch} />
         ) : (
-          <LiveMapView ref={mapRef} stops={stops} liveMarker={pointedMarker} onMapReady={() => setMapReady(true)} routeGeometry={geometry.data} onUserPan={onUserPan} />
+          <LiveMapView ref={mapRef} stops={stops} liveMarker={pointedMarker} onMapReady={() => setMapReady(true)} routeGeometry={geometry.data} roadGuide={roadGuide} onUserPan={onUserPan} />
         )}
       </View>
 

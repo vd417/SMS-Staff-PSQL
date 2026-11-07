@@ -107,12 +107,14 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ logs, le
         ))}
         {cells.map((cell, i) => {
           if (!cell) return <View key={`e-${i}`} style={styles.cell} />;
-          const key = dayKey(new Date(year, month, cell.day));
+          const date = new Date(year, month, cell.day);
+          const key = dayKey(date);
           const onLeave = leaveDays.has(key);
           const worked = workDays.has(key);
           const isToday = key === todayKey;
-          const bg = onLeave ? colors.goldSoft : worked ? role.accent : 'transparent';
-          const fg = worked && !onLeave ? colors.onPrimary : colors.ink;
+          const missed = !onLeave && !worked && date.getTime() <= startOfDay(new Date()).getTime();
+          const bg = onLeave ? colors.danger : worked ? colors.success : missed ? colors.dangerSoft : 'transparent';
+          const fg = onLeave || worked ? '#FFFFFF' : missed ? colors.danger : colors.ink;
           return (
             <View key={key} style={styles.cell}>
               <View
@@ -131,12 +133,16 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({ logs, le
       </View>
       <View style={styles.legend}>
         <View style={styles.legendItem}>
-          <View style={[styles.swatch, { backgroundColor: role.accent }]} />
+          <View style={[styles.swatch, { backgroundColor: colors.success }]} />
           <Text style={[TextScale.caption, { color: colors.inkSoft }]}>{t('attendance.calendar.work')}</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.swatch, { backgroundColor: colors.goldSoft, borderColor: colors.gold, borderWidth: 1 }]} />
+          <View style={[styles.swatch, { backgroundColor: colors.danger }]} />
           <Text style={[TextScale.caption, { color: colors.inkSoft }]}>{t('attendance.calendar.leave')}</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.swatch, { backgroundColor: colors.dangerSoft, borderColor: colors.danger, borderWidth: 1 }]} />
+          <Text style={[TextScale.caption, { color: colors.inkSoft }]}>{t('attendance.calendar.missed')}</Text>
         </View>
       </View>
     </View>
@@ -175,6 +181,7 @@ const styles = StyleSheet.create({
   },
   legend: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 16,
   },
   legendItem: {

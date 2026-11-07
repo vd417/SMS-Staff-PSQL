@@ -32,6 +32,7 @@ function iconTone(icon: IconName, dark: boolean): { color: string; bg: string } 
     case 'clock':
       return { color: dark ? '#F2C766' : '#C48412', bg: dark ? 'rgba(242,199,102,0.22)' : '#FBEAC2' };
     case 'gift':
+    case 'calendar':
       return { color: dark ? '#F09AB8' : '#C2567E', bg: dark ? 'rgba(194,86,126,0.28)' : '#F6D6E4' };
     default:
       return { color: dark ? '#5DDBB8' : '#0E5C4A', bg: dark ? 'rgba(51,191,159,0.22)' : '#CDE7DF' };

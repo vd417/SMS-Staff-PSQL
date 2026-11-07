@@ -40,7 +40,7 @@ export const StatTrio: React.FC<StatTrioProps> = ({ streakDays, leaveLeft }) => 
       {leaveLeft !== undefined && (
         <Card testID="stat-leave" style={styles.statCard}>
           <View style={styles.statRow}>
-            <Icon name="gift" size={20} color={colors.primary} strokeWidth={2} />
+            <Icon name="calendar" size={20} color={colors.primary} strokeWidth={2} />
             <View style={styles.statText}>
               <Text style={[TextScale.cardTitle, { color: colors.ink }]}>
                 {t('home.leaveLeftN', { n: leaveLeft })}

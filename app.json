@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "SchoolMate Staff",
-    "slug": "staff-app",
+    "slug": "schoolmate-staff",
     "scheme": "schoolmatestaff",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -43,7 +43,11 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      ["expo-notifications", { "defaultChannel": "default" }],
+      ["expo-notifications", {
+        "icon": "./assets/notification-icon.png",
+        "color": "#126954",
+        "defaultChannel": "default"
+      }],
       ["expo-location", {
         "locationAlwaysAndWhenInUsePermission": "SchoolMate Staff uses your location to share the live bus position during a trip.",
         "isAndroidBackgroundLocationEnabled": true,
@@ -57,9 +61,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "b19e1153-da8f-4f47-bb3f-2b66da880131"
+        "projectId": "72049b4a-bb4e-42a1-b485-68fb1fe23932"
       }
     },
-    "owner": "vaibhavdds-team"
+    "owner": "catre"
   }
 }

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Alert, View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/theme';
@@ -16,6 +16,7 @@ import { startBroadcast, stopBroadcast } from '@/features/trip/broadcaster';
 import { routeTimelineFor } from '@/features/trip/stopProgress';
 import { useResumeBroadcast } from '@/features/trip/useResumeBroadcast';
 import { stopActionMessage } from '@/features/trip/stopActionMessage';
+import { loadDayDone, markDayDone } from '@/features/trip/dayDone';
 import { isAppError } from '@/lib/errors';
 import type { TripDirection, TripSummary, BoardingState } from '@/data/domain';
 
@@ -112,6 +113,21 @@ export const TripScreen = ({ navigation }: { navigation: any }) => {
   const endTrip = useEndTrip();
   const [direction, setDirection] = useState<TripDirection>('pickup');
   const [summary, setSummary] = useState<TripSummary | null>(null);
+  const [done, setDone] = useState({ pickup: false, drop: false });
+
+  useEffect(() => {
+    let live = true;
+    loadDayDone().then((day) => {
+      if (live) setDone({ pickup: day.pickup, drop: day.drop });
+    }).catch(() => {});
+    return () => { live = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!done[direction]) return;
+    const other: TripDirection = direction === 'pickup' ? 'drop' : 'pickup';
+    if (!done[other]) setDirection(other);
+  }, [done, direction]);
 
   const accent = role.accent;
   const trip = current.data;
@@ -139,7 +155,7 @@ export const TripScreen = ({ navigation }: { navigation: any }) => {
     ) : null;
 
   const onStart = async () => {
-    if (!assignment.data) return;
+    if (!assignment.data || done[direction]) return;
     let started;
     try {
       started = await startTrip.mutateAsync({
@@ -158,7 +174,7 @@ export const TripScreen = ({ navigation }: { navigation: any }) => {
     });
   };
 
-  const onEnd = async () => {
+  const finishEnd = async () => {
     if (!trip) return;
     let s: TripSummary;
     try {
@@ -173,7 +189,21 @@ export const TripScreen = ({ navigation }: { navigation: any }) => {
       return;
     }
     await stopBroadcast().catch(() => {});
+    const next = await markDayDone(trip.direction).catch(() => null);
+    if (next) setDone({ pickup: next.pickup, drop: next.drop });
     setSummary(s);
+  };
+
+  const onEnd = () => {
+    if (!trip || endTrip.isPending) return;
+    Alert.alert(
+      t('trip.endConfirmTitle'),
+      t('trip.endConfirmBody', { direction: t(`trip.dir.${trip.direction}`) }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('trip.endConfirm'), style: 'destructive', onPress: () => { void finishEnd(); } },
+      ],
+    );
   };
 
   return (
@@ -312,14 +342,22 @@ export const TripScreen = ({ navigation }: { navigation: any }) => {
                 <Pressable
                   key={d}
                   testID={`trip-dir-${d}`}
-                  onPress={() => setDirection(d)}
-                  style={[styles.segBtn, { backgroundColor: direction === d ? accent : colors.surface, borderColor: accent }]}
+                  onPress={() => { if (!done[d]) setDirection(d); }}
+                  disabled={done[d]}
+                  accessibilityState={{ disabled: done[d], selected: direction === d }}
+                  style={[styles.segBtn, { backgroundColor: direction === d ? accent : colors.surface, borderColor: accent, opacity: done[d] ? 0.4 : 1 }]}
                 >
                   <Text style={[TextScale.bodyStrong, { color: direction === d ? '#FFFFFF' : accent }]}>{t(`trip.dir.${d}`)}</Text>
+                  {done[d] ? (
+                    <Text testID={`trip-dir-${d}-done`} style={[TextScale.caption, { color: direction === d ? '#FFFFFF' : colors.inkSoft }]}>{t('trip.doneToday')}</Text>
+                  ) : null}
                 </Pressable>
               ))}
             </View>
-            <Btn testID="trip-start" label={t('trip.start')} onPress={onStart} accent={accent} loading={startTrip.isPending} style={styles.cta} />
+            {done.pickup && done.drop ? (
+              <Text testID="trip-both-done" style={[TextScale.caption, { color: colors.inkSoft, textAlign: 'center' }]}>{t('trip.bothDone')}</Text>
+            ) : null}
+            <Btn testID="trip-start" label={t('trip.start')} onPress={onStart} accent={accent} loading={startTrip.isPending} disabled={done[direction]} style={styles.cta} />
           </>
         )}
       </ScrollView>

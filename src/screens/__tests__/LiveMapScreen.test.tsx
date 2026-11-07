@@ -52,6 +52,10 @@ jest.mock('@/features/trip/useRouteGeometry', () => ({
   useRouteGeometry: () => ({ data: undefined, isLoading: false }),
 }));
 
+jest.mock('@/features/map/useDrivePath', () => ({
+  useDrivePath: () => null,
+}));
+
 jest.mock('@/features/trip/useResumeBroadcast', () => ({ useResumeBroadcast: () => undefined }));
 
 const mockMapHandle = { animateToRegion: jest.fn(), fitToCoordinates: jest.fn(), animateCamera: jest.fn() };

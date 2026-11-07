@@ -1,5 +1,5 @@
 import type {
-  Session, Staff, Dashboard, Attendance, SchoolLocation,
+  Session, Staff, Dashboard, Attendance, AttendanceDay, SchoolLocation,
   TripAssignment, Trip, TripPing, TripSummary, StudentLite, Boarding, TripDirection, RouteGeometry, TripStops,
   Task,
   LeaveSummary, LeaveRequest, NewLeaveRequest,
@@ -32,6 +32,8 @@ export interface DashboardRepository {
 
 export interface AttendanceRepository {
   status(): Promise<Attendance>;
+  /** Check-in days for the calendar, newest first, across recent months. */
+  history(): Promise<AttendanceDay[]>;
   schoolLocation(): Promise<SchoolLocation>;
   checkIn(at: string, lat: number, lng: number, accuracyMeters: number): Promise<Attendance>;
   checkOut(at: string, lat: number, lng: number, accuracyMeters: number): Promise<Attendance>;
@@ -112,4 +114,6 @@ export interface Repositories {
 
 export interface RouteGeometryRepository {
   get(routeId: string): Promise<RouteGeometry>;
+  /** Shortest driving path from the bus back to a point on the planned route. Empty when unavailable. */
+  drive(origin: { latitude: number; longitude: number }, destination: { latitude: number; longitude: number }): Promise<{ latitude: number; longitude: number }[]>;
 }

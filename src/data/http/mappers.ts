@@ -207,17 +207,37 @@ export const toAnnouncement = (d: AnnouncementDTO): import('@/data/domain').Anno
   return a;
 };
 
-export interface ChatThreadDTO { id: string; name: string; role?: string; last_message?: string; last_at?: string; unread: number; }
+const photoUrl = (raw?: string) => {
+  const trimmed = raw?.trim();
+  return trimmed ? trimmed : undefined;
+};
+
+const receiptStatus = (raw?: string): import('@/data/domain').ChatReceiptStatus | undefined =>
+  raw === 'sent' || raw === 'delivered' || raw === 'read' ? raw : undefined;
+
+export interface ChatThreadDTO {
+  id: string; name: string; role?: string; last_message?: string; last_at?: string; unread: number;
+  photo_url?: string; last_message_mine?: boolean | null; last_message_status?: string;
+}
 export const toChatThread = (d: ChatThreadDTO): import('@/data/domain').ChatThread => {
   const t: import('@/data/domain').ChatThread = { id: d.id, name: d.name, unread: d.unread };
   if (d.role !== undefined) t.role = d.role;
   if (d.last_message !== undefined) t.lastMessage = d.last_message;
   if (d.last_at !== undefined) t.lastAt = d.last_at;
+  const photo = photoUrl(d.photo_url);
+  if (photo) t.photoUrl = photo;
+  if (d.last_message_mine) t.lastMessageMine = true;
+  const status = receiptStatus(d.last_message_status);
+  if (status) t.lastMessageStatus = status;
   return t;
 };
-export interface ChatContactDTO { id: string; kind: string; name: string; role: string; }
-export const toChatContact = (d: ChatContactDTO): import('@/data/domain').ChatContact =>
-  ({ id: d.id, kind: d.kind, name: d.name, role: d.role });
+export interface ChatContactDTO { id: string; kind: string; name: string; role: string; photo_url?: string; }
+export const toChatContact = (d: ChatContactDTO): import('@/data/domain').ChatContact => {
+  const c: import('@/data/domain').ChatContact = { id: d.id, kind: d.kind, name: d.name, role: d.role };
+  const photo = photoUrl(d.photo_url);
+  if (photo) c.photoUrl = photo;
+  return c;
+};
 
 export interface ChatMessageDTO {
   id: string; text: string; sent_at: string; is_mine: boolean; image_url?: string;
@@ -294,11 +314,25 @@ export interface LeaveSummaryDTO { balances: LeaveBalanceDTO[]; requests: LeaveR
 export const toLeaveBalance = (d: LeaveBalanceDTO): LeaveBalance => ({ type: d.type as LeaveBalance['type'], total: d.total, used: d.used });
 export const toLeaveRequest = (d: LeaveRequestDTO): LeaveRequest => ({ id: d.id, type: d.type as LeaveRequest['type'], fromDate: d.from_date, toDate: d.to_date, reason: d.reason, status: d.status });
 export const toLeaveSummary = (d: LeaveSummaryDTO): LeaveSummary => ({ balances: d.balances.map(toLeaveBalance), requests: d.requests.map(toLeaveRequest) });
-export const fromNewLeave = (r: NewLeaveRequest) => ({ type: r.type, from_date: r.fromDate, to_date: r.toDate, reason: r.reason });
+export function parseAttachmentUrls(raw: unknown): string[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.filter((x): x is string => typeof x === 'string' && x.length > 0);
+  if (typeof raw !== 'string' || !raw.trim()) return [];
+  try {
+    return parseAttachmentUrls(JSON.parse(raw) as unknown);
+  } catch {
+    return [];
+  }
+}
+
+export const fromNewLeave = (r: NewLeaveRequest) => ({
+  type: r.type, from_date: r.fromDate, to_date: r.toDate, reason: r.reason,
+  ...(r.attachmentUrls?.length ? { attachment_urls: r.attachmentUrls } : {}),
+});
 
 // sms-backend's real /v1/leave — a superset of LeaveRequestDTO (requester_id, child_id,
-// substitute, applied_on, decided_note, priority, attachment_urls are ignored for now, not
-// modeled by sms-staff's domain). /v1/leave/balances is the separate LeaveBalanceDTO[] source.
+// substitute, applied_on, priority are ignored). attachment_urls is mapped when present.
+// /v1/leave/balances is the separate LeaveBalanceDTO[] source.
 export interface LeaveRequestWireDTO {
   id: string;
   type: CanonicalLeaveType;
@@ -308,6 +342,7 @@ export interface LeaveRequestWireDTO {
   status: LeaveRequest['status'];
   decided_by_name?: string | null;
   decided_note?: string | null;
+  attachment_urls?: string | string[] | null;
 }
 export const toLeaveRequestFromWire = (d: LeaveRequestWireDTO): LeaveRequest => {
   const r: LeaveRequest = {
@@ -322,6 +357,8 @@ export const toLeaveRequestFromWire = (d: LeaveRequestWireDTO): LeaveRequest => 
   // shape matches the mock adapter (contract parity) and nothing renders for pending requests.
   if (d.decided_by_name != null) r.decidedByName = d.decided_by_name;
   if (d.decided_note != null) r.decidedNote = d.decided_note;
+  const attachmentUrls = parseAttachmentUrls(d.attachment_urls);
+  if (attachmentUrls.length > 0) r.attachmentUrls = attachmentUrls;
   return r;
 };
 

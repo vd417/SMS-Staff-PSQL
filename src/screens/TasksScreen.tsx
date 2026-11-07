@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TextInput, Pressable } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/theme';
 import { useTasks, useCompleteTask } from '@/features/tasks/hooks';
@@ -93,12 +93,11 @@ function TaskRow({ task }: { task: Task }) {
 export const TasksScreen = () => {
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
   const { data, isLoading, isError, refetch } = useTasks();
 
   if (isLoading) {
     return (
-      <SafeAreaView style={[styles.fill, { backgroundColor: colors.bg }]}>
+      <SafeAreaView edges={['top', 'left', 'right']} style={[styles.fill, { backgroundColor: colors.bg }]}>
         <View style={styles.body}>
           <Skeleton width="100%" height={72} radius={16} />
           <Skeleton width="100%" height={72} radius={16} />
@@ -107,13 +106,13 @@ export const TasksScreen = () => {
     );
   }
   if (isError) {
-    return <SafeAreaView style={[styles.fill, { backgroundColor: colors.bg }]}><ErrorState onRetry={refetch} /></SafeAreaView>;
+    return <SafeAreaView edges={['top', 'left', 'right']} style={[styles.fill, { backgroundColor: colors.bg }]}><ErrorState onRetry={refetch} /></SafeAreaView>;
   }
 
   return (
-    <SafeAreaView style={[styles.fill, { backgroundColor: colors.bg }]}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.fill, { backgroundColor: colors.bg }]}>
       <Text style={[TextScale.screenTitle, styles.title, { color: colors.ink }]}>{t('nav.tasks')}</Text>
-      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 160 }]}>
+      <ScrollView contentContainerStyle={styles.body}>
         {data?.map((task) => <TaskRow key={task.id} task={task} />)}
       </ScrollView>
     </SafeAreaView>
@@ -123,7 +122,7 @@ export const TasksScreen = () => {
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   title: { paddingHorizontal: 16, paddingTop: 12 },
-  body: { padding: 16, gap: 12 },
+  body: { padding: 16, gap: 12, paddingBottom: 24 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   rowText: { flex: 1, gap: 2 },
   remarkDone: { marginTop: 8 },

@@ -31,6 +31,7 @@ jest.mock('@/features/attendance/hooks', () => {
     useSchoolLocation: () => ({ data: { lat: 28.4595, lng: 77.0266, radiusMeters: 120, name: 'Greenfield Public School' }, isLoading: false }),
     useCheckIn: () => ({ mutate: jest.fn(), mutateAsync: mockCheckInMutateAsync, isPending: false }),
     useCheckOut: () => ({ mutate: jest.fn(), mutateAsync: jest.fn(async () => {}), isPending: false }),
+    useAttendanceHistory: () => ({ data: [] }),
   };
 });
 

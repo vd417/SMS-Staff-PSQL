@@ -5,6 +5,9 @@ import { opt, orEmpty } from './wire';
 export const chatThreadSchema = z.object({
   id: z.string(), name: orEmpty, role: opt(z.string()),
   last_message: opt(z.string()), last_at: opt(z.string()), unread: z.number(),
+  photo_url: opt(z.string()),
+  last_message_mine: z.boolean().nullish(),
+  last_message_status: opt(z.string()),
 });
 export const chatThreadListSchema = z.array(chatThreadSchema);
 export const chatMessageSchema = z.object({
@@ -13,7 +16,9 @@ export const chatMessageSchema = z.object({
   is_delivered: z.boolean().optional(), is_read: z.boolean().optional(),
 });
 export const chatMessageListSchema = z.array(chatMessageSchema);
-export const chatContactSchema = z.object({ id: z.string(), kind: orEmpty, name: orEmpty, role: orEmpty });
+export const chatContactSchema = z.object({
+  id: z.string(), kind: orEmpty, name: orEmpty, role: orEmpty, photo_url: opt(z.string()),
+});
 export const chatContactListSchema = z.array(chatContactSchema);
 
 // Announcements (shared /v1/announcements). Staff inbox reads a subset of the CRM fields.
@@ -44,6 +49,7 @@ export const leaveRequestSchema = z.object({
   id: z.string(), type: leaveType, from_date: z.string().nullable(), to_date: z.string().nullable(),
   reason: z.string().nullable(), status: z.enum(['pending', 'approved', 'rejected']),
   decided_by_name: z.string().nullish(), decided_note: z.string().nullish(),
+  attachment_urls: z.union([z.string(), z.array(z.string())]).nullish(),
 });
 export const leaveListSchema = z.array(leaveRequestSchema);
 
@@ -64,6 +70,12 @@ export const fuelLogSchema = z.object({
   id: z.string(), bus_id: z.string(), odometer_km: z.number(), fuel_added_liters: z.number(), recorded_at: z.string(),
 });
 export const fuelLogListSchema = z.array(fuelLogSchema);
+
+export const driveLegSchema = z.object({
+  geometry: z.string().nullish(),
+  distance_meters: z.number().nullish(),
+  duration_seconds: z.number().nullish(),
+});
 
 export const routeGeometrySchema = z.object({
   route_id: z.string(), status: z.enum(['available', 'unavailable']), format: z.string().nullable(), geometry: z.string().nullable(),

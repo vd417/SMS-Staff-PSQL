@@ -18,8 +18,8 @@ export interface TabBarProps {
 // Icon names for the 4 tabs
 const TAB_ICONS: Record<string, IconName> = {
   Home: 'home',
-  Inbox: 'mail',
-  Leave: 'gift',
+  Inbox: 'chat',
+  Leave: 'calendar',
   Tasks: 'tasks',
   Me: 'user',
 };
@@ -32,9 +32,12 @@ const TAB_LABEL_KEY: Record<string, string> = {
   Me: 'nav.me',
 };
 
-const BAR_HEIGHT = 76;
-const BAR_SIDE_INSET = 14;
-const BAR_RADIUS = 26;
+/** Height of the tab row above the system inset. Chat uses this to sit above the keyboard. */
+export const TAB_BAR_BODY_HEIGHT = 62;
+
+export function tabBarHeight(bottomInset: number): number {
+  return TAB_BAR_BODY_HEIGHT + Math.max(bottomInset, 8);
+}
 
 export const TabBar: React.FC<TabBarProps> = ({ state, navigation, descriptors }) => {
   const { t } = useTranslation();
@@ -74,12 +77,12 @@ export const TabBar: React.FC<TabBarProps> = ({ state, navigation, descriptors }
         accessibilityLabel={label}
       >
         <View style={styles.tabInner}>
-          <View>
+          <View style={[styles.iconSlot, isFocused && { backgroundColor: role.accentSoft }]}>
             <Icon
               name={iconName}
               size={22}
               color={iconColor}
-              strokeWidth={isFocused ? 2.5 : 2}
+              strokeWidth={isFocused ? 2.4 : 1.9}
             />
             {route.name === 'Inbox' && inboxUnread > 0 ? (
               <View testID="inbox-badge" style={[styles.badge, { backgroundColor: colors.danger, borderColor: colors.surface }]}>
@@ -87,7 +90,7 @@ export const TabBar: React.FC<TabBarProps> = ({ state, navigation, descriptors }
               </View>
             ) : null}
           </View>
-          <Text numberOfLines={1} style={[styles.tabLabel, { color: iconColor }]}>
+          <Text numberOfLines={1} style={[styles.tabLabel, { color: iconColor, fontWeight: isFocused ? '800' : '600' }]}>
             {label}
           </Text>
         </View>
@@ -98,87 +101,58 @@ export const TabBar: React.FC<TabBarProps> = ({ state, navigation, descriptors }
   return (
     <View
       style={[
-        styles.outerContainer,
+        styles.bar,
         {
-          paddingBottom: insets.bottom + 8,
-          paddingTop: 8,
-          backgroundColor: colors.bg,
+          paddingBottom: Math.max(insets.bottom, 8),
+          backgroundColor: colors.surface,
           borderTopColor: colors.line,
-          pointerEvents: 'box-none',
         },
       ]}
     >
-      <View
-        style={[
-          styles.bar,
-          {
-            backgroundColor: colors.surface,
-            shadowColor: colors.ink,
-            borderColor: colors.line,
-          },
-        ]}
-      >
-        <View style={styles.tabSection}>
-          {routes.map((route, i) => renderTab(route, i))}
-        </View>
-      </View>
+      {routes.map((route, i) => renderTab(route, i))}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  outerContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: BAR_SIDE_INSET,
+  bar: {
+    flexDirection: 'row',
     alignItems: 'center',
     borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  bar: {
-    width: '100%',
-    height: BAR_HEIGHT,
-    borderRadius: BAR_RADIUS,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    // Elevation (Android)
-    elevation: 12,
-    // Shadow (iOS)
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-  },
-  tabSection: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
+    paddingTop: 6,
+    paddingHorizontal: 4,
   },
   tab: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    height: BAR_HEIGHT,
+    minHeight: TAB_BAR_BODY_HEIGHT - 6,
     minWidth: 44,
     paddingHorizontal: 2,
+    paddingVertical: 4,
   },
   tabInner: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    gap: 4,
+  },
+  iconSlot: {
+    width: 52,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tabLabel: {
     fontSize: 10,
     lineHeight: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     textAlign: 'center',
   },
   badge: {
     position: 'absolute',
-    top: -6,
-    right: -10,
+    top: -4,
+    right: 6,
     minWidth: 16,
     height: 16,
     borderRadius: 8,

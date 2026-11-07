@@ -16,5 +16,8 @@ export function mockRouteGeometry(): RouteGeometryRepository {
         generatedAt: null,
       };
     },
+    async drive() {
+      return [];
+    },
   };
 }

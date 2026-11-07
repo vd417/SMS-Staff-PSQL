@@ -7,6 +7,12 @@ export interface ChatThread {
   lastMessage?: string;
   lastAt?: string;
   unread: number;
+  /** Profile photo of the other person, when the server has one. */
+  photoUrl?: string;
+  /** True when the signed-in staff member sent the last message. */
+  lastMessageMine?: boolean;
+  /** Read receipt for that last message, only when lastMessageMine is set. */
+  lastMessageStatus?: ChatReceiptStatus;
 }
 
 export interface ChatContact {
@@ -16,6 +22,8 @@ export interface ChatContact {
   name: string;
   /** Friendly role label, e.g. "Principal" / "School Owner". */
   role: string;
+  /** Profile photo, when the server has one. */
+  photoUrl?: string;
 }
 
 export type ChatReceiptStatus = 'sent' | 'delivered' | 'read';

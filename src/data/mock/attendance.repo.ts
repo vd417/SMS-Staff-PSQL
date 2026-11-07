@@ -17,6 +17,19 @@ export function mockAttendance(store: Store): AttendanceRepository {
       await simulateLatency();
       return clone(store.attendance);
     },
+    async history() {
+      await simulateLatency();
+      const dates = new Set<string>();
+      for (const log of store.attendance.lastLog) {
+        if (log.kind !== 'in') continue;
+        const d = new Date(log.at);
+        if (Number.isNaN(d.getTime())) continue;
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        dates.add(`${d.getFullYear()}-${month}-${day}`);
+      }
+      return [...dates].map((date) => ({ date, checkedIn: true }));
+    },
     async schoolLocation() {
       await simulateLatency();
       return { ...store.schoolLocation };

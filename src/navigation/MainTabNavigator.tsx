@@ -20,7 +20,7 @@ import type { MainStackParamList, MainTabParamList } from './types';
 const Stack = createNativeStackNavigator<MainStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-// Inner bottom-tab navigator using the custom floating TabBar.
+// Inner bottom-tab navigator. The bar is docked to the bottom of the screen.
 // Attendance is reached from Home's "Tap to check in" card and Profile's
 // "My attendance" button — both navigate to the 'Attendance' sibling route
 // in the parent native-stack.

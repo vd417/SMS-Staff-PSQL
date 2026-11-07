@@ -12,7 +12,7 @@ import { RouteUnavailableBadge } from './RouteUnavailableBadge';
 import { MapErrorBoundary } from './MapErrorBoundary';
 import { stopRoles } from './stopRoles';
 import { routeSegments } from './routeSegments';
-import { guideDashes, guideToPath, splitRouteProgress } from './routeProgress';
+import { guideToPath, splitRouteProgress } from './routeProgress';
 import { GuideCursor } from './GuideCursor';
 import { useGlidedCoord } from './useGlidedCoord';
 import type { LiveMapViewProps, LiveMapHandle } from './liveMapTypes';
@@ -23,7 +23,7 @@ export type { LiveMapViewProps, LiveMapHandle };
 // the wrapper can't apply a tilted/heading camera and we recenter instead.
 const zoomToDelta = (zoom: number | undefined): number => 360 / Math.pow(2, zoom ?? 17);
 
-export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops, liveMarker, onMapReady, routeGeometry, onUserPan }, ref) => {
+export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops, liveMarker, onMapReady, routeGeometry, roadGuide, onUserPan }, ref) => {
   const { colors } = useTheme();
   const mapRef = useRef<Partial<RNMapView>>(null);
   const containerRef = useRef<unknown>(null);
@@ -79,7 +79,7 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
   const offRoute = route?.offRoute ?? false;
   const roles = stopRoles(safeStops, safeLive, { offRoute });
   const guide = guideToPath(line ?? coords, safeLive);
-  const guideDots = guideDashes(guide);
+  const road = roadGuide && roadGuide.length > 1 ? roadGuide : null;
   const glidedLive = useGlidedCoord(safeLive);
 
   // teovilla only forwards onPanDrag for map DRAG, so a scroll-wheel zoom wouldn't drop follow
@@ -129,12 +129,12 @@ export const LiveMapView = forwardRef<LiveMapHandle, LiveMapViewProps>(({ stops,
         {route && route.traveled.length > 1 && (
           <Polyline testID="map-polyline-traveled" coordinates={route.traveled} strokeWidth={9} strokeColor={colors.primaryDim} />
         )}
-        {guideDots.map((seg, i) => (
-          <Polyline key={`guide-casing-${i}`} coordinates={seg} strokeWidth={8} strokeColor="#FFFFFF" />
-        ))}
-        {guideDots.map((seg, i) => (
-          <Polyline key={`guide-${i}`} testID="map-guide-to-path" coordinates={seg} strokeWidth={5} strokeColor="#7ECFC0" />
-        ))}
+        {road && (
+          <Polyline coordinates={road} strokeWidth={10} strokeColor="#FFFFFF" />
+        )}
+        {road && (
+          <Polyline testID="map-guide-to-path" coordinates={road} strokeWidth={6} strokeColor="#1A73E8" />
+        )}
         {guide.length > 1 && (
           <Marker coordinate={guide[guide.length - 1]} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges>
             <GuideCursor />

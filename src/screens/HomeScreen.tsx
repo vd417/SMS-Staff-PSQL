@@ -1,7 +1,7 @@
 // src/screens/HomeScreen.tsx
 import React, { useCallback, useEffect } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 import * as ImagePicker from 'expo-image-picker';
@@ -34,7 +34,6 @@ function shiftTiming(card: RoleCard | null): string {
 export const HomeScreen = ({ navigation }: { navigation: any }) => {
   const { t } = useTranslation();
   const { colors, dark, toggleDark, role } = useTheme();
-  const insets = useSafeAreaInsets();
   const { session } = useAuth();
   const { data: d, isLoading, isError, refetch } = useDashboard();
   const att = useAttendanceStatus();
@@ -84,12 +83,12 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
         { testID: 'home-attendance', label: t('attendance.title'), icon: 'clock', onPress: openAttendance },
         { testID: 'home-my-tasks', label: t('home.myTasks'), icon: 'tasks', onPress: () => navigation.navigate('Tasks') },
         { testID: 'home-report-issue', label: t('issues.reportIssue'), icon: 'alert', onPress: () => navigation.navigate('Issues') },
-        { testID: 'home-leave', label: t('leave.title'), icon: 'gift', onPress: () => navigation.navigate('Leave') },
+        { testID: 'home-leave', label: t('leave.title'), icon: 'calendar', onPress: () => navigation.navigate('Leave') },
       ];
 
   if (isLoading) {
     return (
-      <SafeAreaView style={[styles.fill, { backgroundColor: colors.bg }]}>
+      <SafeAreaView edges={['top', 'left', 'right']} style={[styles.fill, { backgroundColor: colors.bg }]}>
         <View style={styles.skeletonContainer}>
           {/* Header placeholder */}
           <Skeleton width="60%" height={24} radius={8} style={styles.skeletonItem} />
@@ -105,7 +104,7 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
 
   if (isError) {
     return (
-      <SafeAreaView style={[styles.fill, { backgroundColor: colors.bg }]}>
+      <SafeAreaView edges={['top', 'left', 'right']} style={[styles.fill, { backgroundColor: colors.bg }]}>
         <ErrorState onRetry={refetch} />
       </SafeAreaView>
     );
@@ -116,8 +115,8 @@ export const HomeScreen = ({ navigation }: { navigation: any }) => {
   }
 
   return (
-    <SafeAreaView style={[styles.fill, { backgroundColor: colors.bg }]}>
-      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 160 }]} showsVerticalScrollIndicator={false}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.fill, { backgroundColor: colors.bg }]}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Header
           schoolName={session.tenant.name}
           firstName={session.user.firstName}
@@ -178,6 +177,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     gap: 12,
+    paddingBottom: 24,
   },
   stack: {
     paddingHorizontal: 16,

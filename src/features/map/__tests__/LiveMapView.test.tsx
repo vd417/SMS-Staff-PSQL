@@ -117,7 +117,7 @@ describe('LiveMapView (native)', () => {
   });
 
   it('shows the bus icon and a light highlight on each nearby stop when the van is off the route', () => {
-    const { getByTestId, getAllByTestId, queryByTestId } = renderWithTheme(
+    const { getByTestId, queryByTestId } = renderWithTheme(
       <LiveMapView
         stops={stops}
         liveMarker={{ latitude: 12.1, longitude: 77.098 }}
@@ -126,10 +126,25 @@ describe('LiveMapView (native)', () => {
     expect(within(getByTestId('map-live-marker')).getByTestId('bus-marker')).toBeTruthy();
     expect(within(getByTestId('map-stop-s1')).getByTestId('stop-marker-near')).toBeTruthy();
     expect(getByTestId('map-stop-s1')).toHaveTextContent('Gate');
-    expect(getAllByTestId('map-guide-to-path').length).toBeGreaterThan(0);
+    expect(queryByTestId('map-guide-to-path')).toBeNull();
     expect(getByTestId('map-guide-cursor')).toBeTruthy();
     expect(within(getByTestId('map-stop-s2')).queryByTestId('stop-marker-near')).toBeNull();
     expect(queryByTestId('map-polyline')).toBeTruthy();
+  });
+
+  it('draws a road path back to the route instead of a straight line over buildings', () => {
+    const { getAllByTestId } = renderWithTheme(
+      <LiveMapView
+        stops={stops}
+        liveMarker={{ latitude: 12.1, longitude: 77.098 }}
+        roadGuide={[
+          { latitude: 12.1, longitude: 77.098 },
+          { latitude: 12.1004, longitude: 77.0992 },
+          { latitude: 12.1, longitude: 77.1 },
+        ]}
+      />,
+    );
+    expect(getAllByTestId('map-guide-to-path')).toHaveLength(1);
   });
 
   it('draws the stop-to-stop path and no badge while geometry has not loaded yet', () => {
