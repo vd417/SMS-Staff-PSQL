@@ -1,5 +1,5 @@
 // src/screens/LoginScreen.tsx — production Login screen
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +26,17 @@ const emailSchema = z.string().email();
 
 function stripPhone(raw: string): string {
   return raw.replace(/\s/g, '');
+}
+
+function otpWaitMs(identifier: string): number {
+  return identifier.includes('@') ? 60_000 : 300_000;
+}
+
+function formatWait(ms: number): string {
+  const seconds = Math.max(0, Math.ceil(ms / 1000));
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m <= 0 ? `${s}s` : `${m}:${String(s).padStart(2, '0')}`;
 }
 
 function isValidPhone(raw: string): boolean {
@@ -117,11 +128,24 @@ export const LoginScreen = () => {
     });
   }
 
+  const [resendUntil, setResendUntil] = useState(0);
+  const [resendNow, setResendNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (resendUntil <= Date.now()) return;
+    const id = setInterval(() => setResendNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [resendUntil]);
+  const resendLeft = Math.max(0, resendUntil - resendNow);
+
   function handleSendOtp() {
+    if (resendLeft > 0) return;
     activate.reset();
     setCode('');
     requestOtp.mutate(identifier, {
       onSuccess: (challenge) => {
+        const at = Date.now();
+        setResendNow(at);
+        setResendUntil(at + otpWaitMs(identifier));
         setDestination(challenge.destination);
         setMode('otp-activate');
       },
@@ -243,10 +267,10 @@ export const LoginScreen = () => {
             )}
             <Btn
               testID="send-otp-cta"
-              label={t('login.sendOtp')}
+              label={resendLeft > 0 ? `${t('login.sendOtp')} ${formatWait(resendLeft)}` : t('login.sendOtp')}
               onPress={handleSendOtp}
               loading={requestOtp.isPending}
-              disabled={!identifierValid}
+              disabled={!identifierValid || resendLeft > 0}
               accent={accent}
             />
             <Pressable testID="back-to-password-link" onPress={backToPasswordLogin}>
@@ -304,8 +328,10 @@ export const LoginScreen = () => {
             />
 
             <View style={styles.linksRow}>
-              <Pressable onPress={handleSendOtp} disabled={requestOtp.isPending}>
-                <Text style={[TextScale.button, { color: accent }]}>{t('login.resend')}</Text>
+              <Pressable onPress={handleSendOtp} disabled={requestOtp.isPending || resendLeft > 0}>
+                <Text style={[TextScale.button, { color: accent, opacity: resendLeft > 0 ? 0.5 : 1 }]}>
+                  {resendLeft > 0 ? `${t('login.resend')} ${formatWait(resendLeft)}` : t('login.resend')}
+                </Text>
               </Pressable>
               <Pressable onPress={handleChangeIdentifierInSetup}>
                 <Text style={[TextScale.button, { color: accent }]}>{t('login.change')}</Text>

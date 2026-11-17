@@ -34,6 +34,7 @@ export function authErrorMessage(err: unknown, fallback: string = DEFAULT_FALLBA
     if (err.status === 0 && err.code !== 'contract_mismatch') {
       return 'Cannot reach the server. Please check your connection and try again.';
     }
+    if (err.code === 'otp_cooldown') return err.message;
     if (err.status === 429) return 'Too many attempts. Please wait a moment and try again.';
     if (err.code in PREFER_SERVER_MESSAGE) return err.message || PREFER_SERVER_MESSAGE[err.code];
     return MESSAGES[err.code] ?? err.message ?? fallback;
